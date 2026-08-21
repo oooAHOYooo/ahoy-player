@@ -2,7 +2,7 @@
 
 Ahoy Player is one local-first music product with separate platform hosts. Its shared behavior lives in TypeScript packages; Electron, the touch PWA, the Linux TV kiosk, and a future Xbox host each own their platform APIs.
 
-The first milestone imports MP3 files, deliberately ignores embedded tags in the display model, derives clean labels from filenames and folders, detects duplicates, persists library metadata, and drives every screen through the same Ahoy Dial action model. Playback state is working; audio output remains behind the `PlaybackAdapter` boundary and uses a simulated adapter in this milestone.
+The first milestone imports MP3 files, reads embedded ID3 metadata locally, fills any missing labels from filenames and folders, detects duplicates, persists library metadata, and drives every screen through the same Ahoy Dial action model. Playback state is working; audio output remains behind the `PlaybackAdapter` boundary and uses a simulated adapter in this milestone.
 
 ## Run it
 
@@ -77,6 +77,8 @@ docs/
 5. Missing labels fall back to meaningful parent folders, then `Unknown Artist` / `Local Imports`.
 6. SHA-256 is the strong duplicate key. Hosts that cannot read bytes fall back to normalized filename plus byte size.
 7. Accepted tracks merge into the same normalized `LibraryRecord`; the batch produces a durable `ImportReceipt`.
+
+Re-importing a file with the same content fingerprint does not create a duplicate. If newly read embedded tags are available, its existing local record is refreshed in place.
 
 The Electron bridge uses the native file dialog and SHA-256 hashes. The PWA hashes browser-selected file bytes with Web Crypto. A real Linux launcher can inject `window.ahoyKiosk.chooseMp3Files()`; the development kiosk falls back to the browser picker.
 

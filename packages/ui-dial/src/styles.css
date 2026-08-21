@@ -91,3 +91,83 @@
 .ahoy-dial__tick--b { right: 5%; top: 36%; }
 .ahoy-dial__tick--c { bottom: 5%; right: 36%; }
 .ahoy-dial__tick--d { left: 5%; bottom: 36%; }
+
+.signal-field {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--signal-field, #afbeb2);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.signal-field:focus-visible { outline: 2px solid var(--signal-accent, #e76b48); outline-offset: -0.35rem; }
+.signal-field__axis { position: absolute; top: 0; bottom: 0; left: 24%; width: 14%; background: var(--signal-accent, #e76b48); }
+.signal-field__chart { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; }
+.signal-field__chart path { fill: none; stroke: color-mix(in srgb, var(--signal-ink, #4d625c) 15%, transparent); stroke-width: 0.24; stroke-dasharray: 1 2.3; }
+.signal-field__wake {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  transform: rotate(-90deg);
+}
+.signal-field__wake ellipse { fill: none; }
+.signal-field__wake-base { stroke: color-mix(in srgb, var(--signal-ink, #4d625c) 34%, transparent); stroke-width: 0.38; }
+.signal-field__wake-trace {
+  stroke: var(--signal-accent, #e76b48);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 0.14rem color-mix(in srgb, var(--signal-accent, #e76b48) 45%, transparent));
+  transition: stroke-dasharray 120ms linear;
+}
+.signal-field__orbit { position: absolute; border: 1px solid var(--signal-ink, #4d625c); border-radius: 50%; pointer-events: none; }
+.signal-field__orbit--outer { width: 78%; height: 78%; top: 11%; left: 11%; }
+.signal-field__orbit--inner { width: 46%; height: 46%; top: 27%; left: 27%; border-width: 3px; }
+.signal-field__bearing { position: absolute; z-index: 2; color: color-mix(in srgb, var(--signal-ink, #4d625c) 76%, transparent); font: 600 0.38rem/1 ui-monospace, monospace; letter-spacing: 0.06em; pointer-events: none; }
+.signal-field__bearing--north { top: 0.7rem; left: 50%; transform: translateX(-50%); }
+.signal-field__bearing--east { top: 50%; right: 0.55rem; transform: translateY(-50%); }
+.signal-field__bearing--south { bottom: 1.3rem; left: 50%; transform: translateX(-50%); }
+.signal-field__bearing--west { top: 50%; left: 0.55rem; transform: translateY(-50%); }
+.signal-field__beacon {
+  position: absolute;
+  z-index: 2;
+  width: 1.55rem;
+  height: 1.55rem;
+  background: #182323;
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--signal-accent, #e76b48) 18%, transparent);
+  transform: translate(-50%, -50%) rotate(45deg);
+  pointer-events: none;
+  transition: left 90ms linear, top 90ms linear;
+}
+.signal-field__core {
+  position: absolute;
+  z-index: 3;
+  inset: 36% 35%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--signal-ink, #4d625c);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--signal-field, #afbeb2) 35%, transparent);
+  color: var(--signal-ink, #33403d);
+  font: 650 0.57rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.signal-field__core::after { content: ""; position: absolute; inset: -0.3rem; border: 1px solid transparent; border-radius: inherit; pointer-events: none; }
+.signal-field__core:hover { background: color-mix(in srgb, var(--signal-pale, #e6e2d5) 46%, transparent); transform: scale(1.04); }
+.signal-field.is-playing .signal-field__core::after { border-color: color-mix(in srgb, var(--signal-accent, #e76b48) 46%, transparent); animation: signal-pulse 1.8s ease-out infinite; }
+.signal-field__hint { position: absolute; left: 0.7rem; bottom: 0.65rem; color: var(--signal-ink, #30403b); font: 600 0.45rem/1 ui-monospace, monospace; letter-spacing: 0.1em; }
+
+@keyframes signal-pulse {
+  0% { opacity: 0.7; transform: scale(0.92); }
+  65%, 100% { opacity: 0; transform: scale(1.38); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-field.is-playing .signal-field__core::after { animation: none; }
+}

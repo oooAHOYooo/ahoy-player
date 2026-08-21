@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLibraryFromImports } from "@ahoy/player-core";
+import { buildLibraryFromImports, mergeImportBatch } from "@ahoy/player-core";
 import { createDuplicateKey, normalizeImport, parseFilename, runImportPipeline } from "./metadata";
 
 const candidate = {
@@ -9,8 +9,8 @@ const candidate = {
   fingerprint: "ABC123"
 };
 
-describe("filename-first metadata", () => {
-  it("uses the filename and never accepts an embedded-tag display model", () => {
+describe("metadata normalization", () => {
+  it("uses the filename when embedded tags are absent", () => {
     const track = normalizeImport(candidate, "2026-08-21T12:00:00.000Z");
     expect(track).toMatchObject({
       title: "Low Water",
@@ -18,6 +18,24 @@ describe("filename-first metadata", () => {
       albumTitle: "Local Imports",
       trackNumber: 3,
       metadataPolicy: "filename-only"
+    });
+  });
+
+  it("prefers embedded tags and fills any missing values from the filename", () => {
+    const track = normalizeImport({
+      ...candidate,
+      embeddedMetadata: {
+        source: "id3",
+        title: "Tag Title",
+        artistName: "Tag Artist"
+      }
+    }, "2026-08-21T12:00:00.000Z");
+    expect(track).toMatchObject({
+      title: "Tag Title",
+      artistName: "Tag Artist",
+      albumTitle: "Local Imports",
+      trackNumber: 3,
+      metadataPolicy: "embedded-tag"
     });
   });
 
@@ -58,6 +76,30 @@ describe("duplicate detection", () => {
       "already-in-library",
       "repeated-in-batch"
     ]);
+  });
+
+  it("refreshes an existing track with embedded metadata when the same file is re-imported", () => {
+    const importedAt = "2026-08-21T12:00:00.000Z";
+    const existing = buildLibraryFromImports([normalizeImport(candidate, importedAt)]);
+    const batch = runImportPipeline([{
+      ...candidate,
+      embeddedMetadata: {
+        source: "id3",
+        title: "Tagged Low Water",
+        artistName: "Tagged Harbor",
+        albumTitle: "Tagged Album"
+      }
+    }], existing, { now: () => importedAt });
+    const refreshed = mergeImportBatch(existing, batch);
+
+    expect(batch.accepted).toHaveLength(0);
+    expect(batch.duplicates).toHaveLength(1);
+    expect(refreshed.tracks[0]).toMatchObject({
+      title: "Tagged Low Water",
+      artistName: "Tagged Harbor",
+      albumTitle: "Tagged Album",
+      displayMetadata: { policy: "embedded-tag" }
+    });
   });
 
   it("rejects non-MP3 and empty inputs", () => {

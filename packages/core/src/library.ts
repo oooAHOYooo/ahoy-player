@@ -14,7 +14,34 @@ export function createEmptyLibrary(updatedAt = EMPTY_DATE): LibraryRecord {
 }
 
 export function mergeImportBatch(library: LibraryRecord, batch: ImportBatchResult): LibraryRecord {
-  const tracks = [...library.tracks, ...batch.accepted.map(toTrackRecord)];
+  const metadataRefreshes = new Map(
+    batch.duplicates
+      .filter((duplicate) => duplicate.reason === "already-in-library" && duplicate.existingTrackId && (duplicate.candidate.embeddedMetadata || duplicate.candidate.durationMs))
+      .map((duplicate) => [duplicate.existingTrackId!, duplicate.candidate])
+  );
+  const refreshedTracks = library.tracks.map((track) => {
+    const candidate = metadataRefreshes.get(track.id);
+    if (!candidate || track.source.kind !== "local-file") return track;
+    const metadata = candidate.embeddedMetadata;
+    if (!metadata && !candidate.durationMs) return track;
+    const artistName = metadata?.artistName?.trim() || track.artistName;
+    const albumTitle = metadata?.albumTitle?.trim() || track.albumTitle;
+    return {
+      ...track,
+      title: metadata?.title?.trim() || track.title,
+      artistName,
+      artistId: slugId("artist", artistName),
+      albumTitle,
+      albumId: slugId("album", `${artistName}-${albumTitle}`),
+      trackNumber: metadata?.trackNumber && metadata.trackNumber > 0 ? metadata.trackNumber : track.trackNumber,
+      durationMs: candidate.durationMs ?? track.durationMs,
+      displayMetadata: {
+        ...track.displayMetadata,
+        policy: metadata ? "embedded-tag" as const : track.displayMetadata.policy
+      }
+    };
+  });
+  const tracks = [...refreshedTracks, ...batch.accepted.map(toTrackRecord)];
   return {
     schemaVersion: 1,
     tracks,
@@ -69,6 +96,7 @@ function toTrackRecord(track: NormalizedTrackImport): TrackRecord {
     albumId,
     albumTitle: track.albumTitle,
     trackNumber: track.trackNumber,
+    durationMs: track.durationMs,
     importedAt: track.importedAt,
     source: {
       kind: "local-file",

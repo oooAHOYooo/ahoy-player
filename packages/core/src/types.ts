@@ -21,6 +21,14 @@ export type PurchaseTrackSource = {
 
 export type TrackSource = LocalTrackSource | PurchaseTrackSource;
 
+export type EmbeddedTrackMetadata = {
+  source: "id3";
+  title?: string;
+  artistName?: string;
+  albumTitle?: string;
+  trackNumber?: number;
+};
+
 export type TrackRecord = {
   id: TrackId;
   title: string;
@@ -34,8 +42,8 @@ export type TrackRecord = {
   importedAt: string;
   source: TrackSource;
   displayMetadata: {
-    /** Embedded tags never enter the local display model. */
-    policy: "filename-only" | "path-fallback" | "purchase-manifest";
+    /** Embedded ID3 tags are preferred; filename and folder labels fill any gaps. */
+    policy: "embedded-tag" | "filename-only" | "path-fallback" | "purchase-manifest";
     originalFilename?: string;
   };
 };
@@ -83,6 +91,10 @@ export type ImportCandidate = {
   relativePath?: string;
   /** Prefer a SHA-256 digest when the host can read bytes. */
   fingerprint?: string;
+  /** Extracted locally by a host adapter; source files are never changed. */
+  embeddedMetadata?: EmbeddedTrackMetadata;
+  /** Measured locally while reading the media file. */
+  durationMs?: number;
 };
 
 export type NormalizedTrackImport = {
@@ -93,11 +105,12 @@ export type NormalizedTrackImport = {
   artistName: string;
   albumTitle: string;
   trackNumber?: number;
+  durationMs?: number;
   byteSize: number;
   fingerprint?: string;
   duplicateKey: string;
   importedAt: string;
-  metadataPolicy: "filename-only" | "path-fallback";
+  metadataPolicy: "embedded-tag" | "filename-only" | "path-fallback";
 };
 
 export type ImportDuplicate = {

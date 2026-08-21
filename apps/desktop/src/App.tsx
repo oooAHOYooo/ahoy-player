@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, type CSSProperties } from "react";
 import {
   demoLibrary,
   playerScreens,
-  type DialAction
+  type DialAction,
+  type TrackRecord
 } from "@ahoy/player-core";
 import { PlayerList, screenLabels, useAhoyPlayer } from "@ahoy/player-react";
-import { useAhoyInput } from "@ahoy/player-ui-dial";
+import { SignalField, signalThemeFor, useAhoyInput } from "@ahoy/player-ui-dial";
 import { LocalStoragePersistenceAdapter, SimulatedPlaybackAdapter } from "@ahoy/player-web-adapters";
 import { DesktopFileImportAdapter } from "./adapters/desktop-files";
 
@@ -59,7 +60,15 @@ function LibraryWindow({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
   const status = useMemo(() => {
     if (model.isImporting) return "Reading files";
     if (model.lastImport) {
-      return `${model.lastImport.receipt.imported} added · ${model.lastImport.receipt.duplicates} duplicate`;
+      const refreshed = model.lastImport.duplicates.filter((duplicate) =>
+        duplicate.reason === "already-in-library" && Boolean(duplicate.candidate.embeddedMetadata)
+      ).length;
+      const parts = [`${model.lastImport.receipt.imported} added`];
+      if (refreshed) parts.push(`${refreshed} metadata refreshed`);
+      if (model.lastImport.receipt.duplicates - refreshed) {
+        parts.push(`${model.lastImport.receipt.duplicates - refreshed} duplicate`);
+      }
+      return parts.join(" · ");
     }
     return window.ahoyDesktop ? "Desktop library" : "Browser preview";
   }, [model.isImporting, model.lastImport]);
@@ -85,6 +94,8 @@ function LibraryWindow({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
             </button>
           ))}
         </nav>
+
+        <SidebarDataPanel model={model} />
 
         <div className="rail-bottom">
           <button className="import-button" type="button" onClick={() => void model.importFiles()}>
@@ -137,10 +148,11 @@ function LibraryWindow({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
 
 function PlaybackDock({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
   const track = model.nowPlaying;
+  const theme = signalThemeFor(signalSeed(track));
   return (
     <section className="playback-dock" aria-label="Playback dock">
       <button className="dock-art" type="button" onClick={openDeckWindow} aria-label="Open Deck">
-        <SignalArtwork />
+        <SignalArtwork theme={theme} />
       </button>
       <div className="dock-copy">
         <p>{model.playback.status === "playing" ? "PLAYING" : "READY"}</p>
@@ -149,7 +161,7 @@ function PlaybackDock({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
       </div>
       <div className="dock-transport" aria-label="Transport controls">
         <button type="button" onClick={model.previousTrack} aria-label="Previous track">←</button>
-        <button className="dock-play" type="button" onClick={model.togglePlayback}>
+        <button className={`dock-play${model.playback.status === "playing" ? " is-playing" : ""}`} type="button" onClick={model.togglePlayback}>
           {model.playback.status === "playing" ? "PAUSE" : "PLAY"}
         </button>
         <button type="button" onClick={model.nextTrack} aria-label="Next track">→</button>
@@ -164,16 +176,25 @@ function PlaybackDock({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
 function DeckWindow({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
   const track = model.nowPlaying;
   const queuePosition = model.playback.queueIndex >= 0 ? model.playback.queueIndex + 1 : 0;
+  const durationMs = model.playback.durationMs ?? track?.durationMs ?? 240_000;
+  const progress = Math.min(1, Math.max(0, model.playback.positionMs / durationMs));
+  const theme = signalThemeFor(signalSeed(track));
 
   return (
     <main className="deck-window" data-testid="deck-window">
       <header className="deck-window__header">
-        <div><strong>DECK</strong><span>AHOY / LOCAL</span></div>
+        <div><strong>DECK</strong><span>HOME PORT / LOCAL</span></div>
         <p><i className={model.playback.status === "playing" ? "is-live" : ""} /> {model.playback.status}</p>
       </header>
 
       <section className="deck-window__art" aria-label="Current track artwork">
-        <SignalArtwork />
+        <SignalField
+          progress={progress}
+          isPlaying={model.playback.status === "playing"}
+          onSeek={(nextProgress) => model.seek(Math.round(nextProgress * durationMs))}
+          onToggle={model.togglePlayback}
+          theme={theme}
+        />
         <span>{String(queuePosition).padStart(2, "0")} / {String(model.playback.queue.length).padStart(2, "0")}</span>
       </section>
 
@@ -184,27 +205,69 @@ function DeckWindow({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
       </section>
 
       <div className="deck-progress" aria-label="Playback progress">
-        <span style={{ width: model.playback.status === "playing" ? "38%" : "12%" }} />
+        <span style={{ width: `${progress * 100}%` }} />
       </div>
-      <div className="deck-readout"><span>00:00</span><span>LOCAL</span><span>--:--</span></div>
+      <div className="deck-readout"><span>{formatTime(model.playback.positionMs)}</span><span>BEARING {String(Math.round(progress * 360) % 360).padStart(3, "0")}°</span><span>{formatTime(durationMs)}</span></div>
+
+      <LocalSourcePanel track={track} />
 
       <section className="sweep" aria-label="Sweep transport">
-        <div className="sweep__heading"><span>SWEEP</span><small>ARROWS / MOVE · SPACE / PLAY</small></div>
+        <div className="sweep__heading"><span>CHANNEL</span><small>PORT / STARBOARD · SPACE / PLAY</small></div>
         <div className="sweep__controls">
-          <button type="button" onClick={model.previousTrack}><span>←</span> PREV</button>
-          <button className="sweep__play" type="button" onClick={model.togglePlayback}>
+          <button type="button" onClick={model.previousTrack} aria-label="Previous track"><span>←</span> PORT</button>
+          <button className={`sweep__play${model.playback.status === "playing" ? " is-playing" : ""}`} type="button" onClick={model.togglePlayback}>
             {model.playback.status === "playing" ? "PAUSE" : "PLAY"}
           </button>
-          <button type="button" onClick={model.nextTrack}>NEXT <span>→</span></button>
+          <button type="button" onClick={model.nextTrack} aria-label="Next track">STARBOARD <span>→</span></button>
         </div>
       </section>
     </main>
   );
 }
 
-function SignalArtwork() {
+function SidebarDataPanel({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
+  const latestTrack = [...model.library.tracks].reverse().find((track) =>
+    track.source.kind === "local-file" && !track.source.locator.startsWith("/demo/")
+  );
+  const receipt = model.library.imports[0];
+  const refreshed = model.lastImport?.duplicates.filter((duplicate) =>
+    duplicate.reason === "already-in-library" && Boolean(duplicate.candidate.embeddedMetadata)
+  ).length ?? 0;
   return (
-    <span className="signal-art" aria-hidden="true">
+    <section className="sidebar-data" aria-label="Local library data">
+      <div>
+        <p>LOCAL DATA</p>
+        <h2>{latestTrack ? localLocation(latestTrack) : "No personal files imported"}</h2>
+        <small>{latestTrack
+          ? `Latest file: ${sourceFilename(latestTrack)}`
+          : "Import an MP3 to add its local source record."}</small>
+      </div>
+      {receipt && <span>{receipt.imported} ADDED · {refreshed ? `${refreshed} METADATA REFRESHED` : `${receipt.duplicates} DUPLICATE`}</span>}
+    </section>
+  );
+}
+
+function LocalSourcePanel({ track }: { track?: TrackRecord }) {
+  if (!track || track.source.kind !== "local-file") return null;
+  return (
+    <details className="local-source" open>
+      <summary>LOCAL DATA</summary>
+      <dl>
+        <div><dt>FILE</dt><dd>{track.source.filename}</dd></div>
+        <div><dt>LOCATION</dt><dd>{localLocation(track)}</dd></div>
+        <div><dt>DISPLAY</dt><dd>{metadataDescription(track.displayMetadata.policy)}</dd></div>
+      </dl>
+    </details>
+  );
+}
+
+function SignalArtwork({ theme }: { theme: ReturnType<typeof signalThemeFor> }) {
+  return (
+    <span className="signal-art" aria-hidden="true" style={{
+      "--signal-field": theme.field,
+      "--signal-accent": theme.accent,
+      "--signal-ink": theme.ink
+    } as CSSProperties}>
       <i className="signal-art__axis" />
       <i className="signal-art__orbit signal-art__orbit--one" />
       <i className="signal-art__orbit signal-art__orbit--two" />
@@ -226,4 +289,33 @@ function openDeckWindow() {
     "popup=yes,width=430,height=660,resizable=yes,scrollbars=no"
   );
   deck?.focus();
+}
+
+function localLocation(track: TrackRecord): string {
+  if (track.source.kind !== "local-file") return "Ahoy purchase library";
+  if (track.source.locator.startsWith("browser-file:")) return "Browser-selected file — folder private";
+  return track.source.locator;
+}
+
+function sourceFilename(track: TrackRecord): string {
+  return track.source.kind === "local-file" ? track.source.filename : "Ahoy purchase";
+}
+
+function signalSeed(track?: TrackRecord): string | undefined {
+  if (!track) return undefined;
+  return track.source.kind === "local-file"
+    ? track.source.fingerprint ?? track.source.duplicateKey
+    : track.id;
+}
+
+function metadataDescription(policy: TrackRecord["displayMetadata"]["policy"]): string {
+  if (policy === "embedded-tag") return "Embedded tags preferred — filename fills gaps";
+  if (policy === "path-fallback") return "Filename and folder fallback";
+  if (policy === "purchase-manifest") return "Ahoy purchase manifest";
+  return "Filename only";
+}
+
+function formatTime(milliseconds: number): string {
+  const totalSeconds = Math.floor(Math.max(0, milliseconds) / 1_000);
+  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
 }

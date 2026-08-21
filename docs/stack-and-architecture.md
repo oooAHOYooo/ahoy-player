@@ -81,7 +81,7 @@ The renderer never imports Node or Electron APIs directly.
 
 ## Import rules
 
-The local display model is filename-first by design. Embedded tags are ignored rather than trusted or surfaced.
+The local display model prefers embedded ID3 tags when available, then fills missing fields from filenames and folders. The source of the resulting display policy is retained with each local track.
 
 Supported examples include:
 

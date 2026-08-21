@@ -62,6 +62,12 @@ button:focus-visible { outline: 2px solid #e76b48; outline-offset: 3px; }
 .primary-nav button span { font: 500 0.58rem/1 ui-monospace, monospace; color: #5f696b; }
 .primary-nav button.is-active, .primary-nav button:hover { color: #f0eee5; border-left-color: #e76b48; background: #171f21; }
 
+.sidebar-data { margin-top: 2rem; padding: 1rem 0.65rem 0.9rem; border-top: 1px solid #344042; border-bottom: 1px solid #273234; }
+.sidebar-data p { margin: 0 0 0.52rem; color: #e76b48; font: 600 0.52rem/1 ui-monospace, monospace; letter-spacing: 0.12em; }
+.sidebar-data h2 { margin: 0; overflow: hidden; color: #d9d9d1; font: 500 0.64rem/1.45 ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-data small { display: block; margin-top: 0.45rem; overflow: hidden; color: #798486; font: 500 0.53rem/1.35 ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-data > span { display: block; margin-top: 0.7rem; color: #657173; font: 600 0.5rem/1.35 ui-monospace, monospace; }
+
 .rail-bottom { margin-top: auto; }
 .import-button {
   width: 100%;
@@ -147,13 +153,13 @@ button:focus-visible { outline: 2px solid #e76b48; outline-offset: 3px; }
 .open-deck { height: 2.6rem; padding: 0 1rem; border: 1px solid #d7d4ca; background: #d7d4ca; color: #151c1d; font: 650 0.58rem/1 ui-monospace, monospace; letter-spacing: 0.08em; cursor: pointer; }
 .open-deck span { color: #d35f40; }
 
-.signal-art { position: relative; display: block; overflow: hidden; background: #afbeb2; }
+.signal-art { position: relative; display: block; overflow: hidden; background: var(--signal-field, #afbeb2); }
 .signal-art i { position: absolute; display: block; }
-.signal-art__axis { top: 0; bottom: 0; left: 24%; width: 14%; background: #e76b48; }
-.signal-art__orbit { border: 1px solid #4d625c; border-radius: 50%; }
+.signal-art__axis { top: 0; bottom: 0; left: 24%; width: 14%; background: var(--signal-accent, #e76b48); }
+.signal-art__orbit { border: 1px solid var(--signal-ink, #4d625c); border-radius: 50%; }
 .signal-art__orbit--one { width: 78%; height: 78%; top: 11%; left: 11%; }
 .signal-art__orbit--two { width: 46%; height: 46%; top: 27%; left: 27%; border-width: 3px; }
-.signal-art__point { width: 9%; height: 9%; right: 18%; top: 19%; background: #182323; transform: rotate(45deg); }
+.signal-art__point { width: 9%; height: 9%; right: 18%; top: 19%; background: #182323; box-shadow: 0 0 0 0.1rem color-mix(in srgb, var(--signal-accent, #e76b48) 28%, transparent); transform: rotate(45deg); }
 
 .deck-window {
   width: 100%;
@@ -179,6 +185,12 @@ button:focus-visible { outline: 2px solid #e76b48; outline-offset: 3px; }
 .deck-progress { height: 2px; margin-top: 1.5rem; background: #374042; }
 .deck-progress span { display: block; height: 100%; background: #e76b48; transition: width 250ms ease; }
 .deck-readout { display: flex; justify-content: space-between; margin-top: 0.5rem; color: #646f71; font: 500 0.49rem/1 ui-monospace, monospace; }
+.local-source { margin-top: 1rem; border-top: 1px solid #354042; color: #9ca6a4; }
+.local-source summary { padding: 0.72rem 0; color: #e76b48; cursor: pointer; font: 600 0.5rem/1 ui-monospace, monospace; letter-spacing: 0.12em; }
+.local-source dl { display: grid; gap: 0.48rem; margin: 0 0 0.2rem; }
+.local-source dl div { display: grid; grid-template-columns: 4.9rem minmax(0, 1fr); gap: 0.6rem; }
+.local-source dt { color: #687476; font: 600 0.47rem/1.25 ui-monospace, monospace; }
+.local-source dd { margin: 0; overflow-wrap: anywhere; color: #b8bfba; font: 500 0.52rem/1.35 ui-monospace, monospace; }
 .sweep { margin-top: auto; padding-top: 1.5rem; }
 .sweep__heading { display: flex; justify-content: space-between; margin-bottom: 0.65rem; color: #697476; font: 600 0.47rem/1 ui-monospace, monospace; letter-spacing: 0.1em; }
 .sweep__heading small { font: inherit; letter-spacing: 0; }
@@ -189,7 +201,27 @@ button:focus-visible { outline: 2px solid #e76b48; outline-offset: 3px; }
 .sweep__controls button:last-child { text-align: right; padding-right: 1rem; }
 .sweep__controls button:hover { color: #f0eee5; }
 .sweep__controls button span { color: #e76b48; font-size: 0.8rem; }
-.sweep__controls .sweep__play { width: 5.5rem; margin: -0.35rem 0; border: 1px solid #ddd9ce; background: #ddd9ce; color: #162020; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.sweep__controls .sweep__play {
+  width: 5.5rem;
+  margin: -0.35rem 0;
+  border: 1px solid #ddd9ce;
+  background: #ddd9ce;
+  color: #162020;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+}
+.sweep__controls .sweep__play:hover { transform: scale(1.075); background: #f0ede4; }
+.sweep__controls .sweep__play.is-playing { animation: sweep-charge 1.8s ease-in-out infinite; }
+.dock-transport .dock-play.is-playing { color: #f3eee3; background: rgba(231, 107, 72, 0.12); }
+
+@keyframes sweep-charge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(231, 107, 72, 0); }
+  50% { box-shadow: 0 0 0 0.42rem rgba(231, 107, 72, 0.13); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sweep__controls .sweep__play.is-playing { animation: none; }
+}
 
 @media (max-width: 900px) {
   .desktop-shell { grid-template-columns: 5rem minmax(0, 1fr); }
@@ -198,6 +230,8 @@ button:focus-visible { outline: 2px solid #e76b48; outline-offset: 3px; }
   .brand-lockup { justify-content: center; }
   .primary-nav { margin-top: 3rem; }
   .primary-nav button { display: block; padding: 0; text-align: center; font-size: 0.62rem; }
+  .sidebar-data { padding-inline: 0; }
+  .sidebar-data h2, .sidebar-data small, .sidebar-data > span { display: none; }
   .import-button { font-size: 0; }
   .import-button span { font-size: 1.3rem; }
   .library-deck { padding-left: 1.5rem; padding-right: 1.5rem; }
@@ -224,4 +258,7 @@ button:focus-visible { outline: 2px solid #e76b48; outline-offset: 3px; }
   .playback-dock { min-height: 4.6rem; }
   .deck-window { padding: 1.3rem 1.6rem; }
   .deck-window__art { width: min(100%, 15.5rem); margin: 1rem auto; }
+  .local-source { margin-top: 0.7rem; }
+  .local-source summary { padding: 0.5rem 0; }
+  .sweep { padding-top: 0.8rem; }
 }

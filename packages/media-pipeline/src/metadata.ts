@@ -77,19 +77,25 @@ export function normalizeImport(
   duplicateKey = createDuplicateKey(input)
 ): NormalizedTrackImport {
   const parsed = parseFilename(input.filename, input.relativePath);
+  const embedded = normalizeEmbeddedMetadata(input.embeddedMetadata);
   return {
     id: createStableTrackId(duplicateKey),
     filename: input.filename,
     sourceLocator: input.sourceLocator,
-    title: parsed.title,
-    artistName: parsed.artist,
-    albumTitle: parsed.album,
-    trackNumber: parsed.trackNumber,
+    title: embedded.title ?? parsed.title,
+    artistName: embedded.artistName ?? parsed.artist,
+    albumTitle: embedded.albumTitle ?? parsed.album,
+    trackNumber: embedded.trackNumber ?? parsed.trackNumber,
+    durationMs: input.durationMs,
     byteSize: input.byteSize,
     fingerprint: input.fingerprint,
     duplicateKey,
     importedAt,
-    metadataPolicy: parsed.usedPathFallback ? "path-fallback" : "filename-only"
+    metadataPolicy: embedded.hasValues
+      ? "embedded-tag"
+      : parsed.usedPathFallback
+        ? "path-fallback"
+        : "filename-only"
   };
 }
 
@@ -197,6 +203,26 @@ function cleanLabel(value: string): string {
     .replace(/\s+/g, " ")
     .replace(/^[-–—\s]+|[-–—\s]+$/g, "")
     .trim();
+}
+
+function normalizeEmbeddedMetadata(input: ImportCandidate["embeddedMetadata"]): {
+  hasValues: boolean;
+  title?: string;
+  artistName?: string;
+  albumTitle?: string;
+  trackNumber?: number;
+} {
+  const title = cleanLabel(input?.title ?? "") || undefined;
+  const artistName = cleanLabel(input?.artistName ?? "") || undefined;
+  const albumTitle = cleanLabel(input?.albumTitle ?? "") || undefined;
+  const trackNumber = input?.trackNumber && input.trackNumber > 0 ? input.trackNumber : undefined;
+  return {
+    hasValues: Boolean(title || artistName || albumTitle || trackNumber),
+    title,
+    artistName,
+    albumTitle,
+    trackNumber
+  };
 }
 
 /** Small deterministic hash for IDs only; file fingerprints should use SHA-256 in the host. */

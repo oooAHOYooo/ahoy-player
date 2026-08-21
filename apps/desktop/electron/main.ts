@@ -4,6 +4,7 @@ import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { parseFile } from "music-metadata";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | undefined;
@@ -62,14 +63,19 @@ function registerDesktopBridge() {
     if (result.canceled) return [];
 
     return Promise.all(result.filePaths.map(async (sourceLocator) => {
-      const details = await stat(sourceLocator);
+      const [details, fingerprint, audioDetails] = await Promise.all([
+        stat(sourceLocator),
+        hashFile(sourceLocator),
+        readAudioDetails(sourceLocator)
+      ]);
       return {
         filename: sourceLocator.split(/[\\/]/).at(-1) ?? sourceLocator,
         sourceLocator,
         byteSize: details.size,
         modifiedAt: details.mtime.toISOString(),
         mimeType: "audio/mpeg",
-        fingerprint: await hashFile(sourceLocator)
+        fingerprint,
+        ...audioDetails
       };
     }));
   });
@@ -122,4 +128,23 @@ function hashFile(path: string): Promise<string> {
     stream.on("data", (chunk) => digest.update(chunk));
     stream.on("end", () => resolve(digest.digest("hex")));
   });
+}
+
+async function readAudioDetails(path: string) {
+  try {
+    const metadata = await parseFile(path, { duration: true, skipCovers: true });
+    const title = metadata.common.title?.trim();
+    const artistName = metadata.common.artist?.trim();
+    const albumTitle = metadata.common.album?.trim();
+    const trackNumber = metadata.common.track.no || undefined;
+    const durationMs = metadata.format.duration ? Math.round(metadata.format.duration * 1_000) : undefined;
+    return {
+      ...(title || artistName || albumTitle || trackNumber
+        ? { embeddedMetadata: { source: "id3" as const, title, artistName, albumTitle, trackNumber } }
+        : {}),
+      ...(durationMs ? { durationMs } : {})
+    };
+  } catch {
+    return {};
+  }
 }

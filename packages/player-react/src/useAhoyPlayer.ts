@@ -46,6 +46,7 @@ export type AhoyPlayerModel = {
   openScreen: (screen: PlayerScreen) => void;
   importFiles: () => Promise<void>;
   togglePlayback: () => void;
+  seek: (positionMs: number) => void;
   nextTrack: () => void;
   previousTrack: () => void;
 };
@@ -132,6 +133,14 @@ export function useAhoyPlayer({
       if (playbackAdapter) {
         void (next.status === "playing" ? playbackAdapter.play() : playbackAdapter.pause());
       }
+      return next;
+    });
+  }, [playbackAdapter]);
+
+  const seek = useCallback((positionMs: number) => {
+    setPlayback((current) => {
+      const next = reducePlayback(current, { type: "seek", positionMs });
+      if (playbackAdapter) void playbackAdapter.seek(next.positionMs);
       return next;
     });
   }, [playbackAdapter]);
@@ -243,6 +252,7 @@ export function useAhoyPlayer({
     openScreen,
     importFiles,
     togglePlayback,
+    seek,
     nextTrack,
     previousTrack
   };
@@ -292,11 +302,12 @@ function getItemsForScreen(
     });
   }
   if (screen === "imports") {
-    return library.imports.map((receipt) => ({
-      id: receipt.id,
-      primary: `${receipt.imported} added`,
-      secondary: new Date(receipt.completedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
-      meta: receipt.duplicates ? `${receipt.duplicates} dup` : "clean"
+    return [...library.tracks].reverse().map((track) => ({
+      id: track.id,
+      primary: track.title,
+      secondary: `${track.source.kind === "local-file" ? track.source.filename : "Ahoy purchase"} · ${metadataLabel(track.displayMetadata.policy)}`,
+      meta: "local",
+      trackId: track.id
     }));
   }
   return nowPlaying ? [{
@@ -315,4 +326,11 @@ function countForScreen(screen: PlayerScreen, library: LibraryRecord): string {
   if (screen === "imports") return `${library.imports.length}`;
   if (screen === "now-playing") return "current";
   return "";
+}
+
+function metadataLabel(policy: TrackRecord["displayMetadata"]["policy"]): string {
+  if (policy === "embedded-tag") return "embedded tags";
+  if (policy === "path-fallback") return "path fallback";
+  if (policy === "purchase-manifest") return "purchase manifest";
+  return "filename display";
 }

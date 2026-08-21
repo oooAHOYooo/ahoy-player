@@ -8,7 +8,8 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@ahoy/player-core": "0.1.0"
+    "@ahoy/player-core": "0.1.0",
+    "music-metadata": "^11.15.0"
   },
   "devDependencies": {
     "typescript": "^5.5.4"
