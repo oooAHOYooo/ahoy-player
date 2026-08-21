@@ -88,9 +88,6 @@ export function SignalField({
       onKeyDown={onKeyDown}
     >
       <span className="signal-field__axis" />
-      <svg className="signal-field__chart" viewBox="0 0 100 100" aria-hidden="true">
-        <path d="M50 0V100M0 50H100M25 0V100M75 0V100M0 25H100M0 75H100" />
-      </svg>
       <svg className="signal-field__wake" viewBox="0 0 100 100" aria-hidden="true">
         <ellipse className="signal-field__wake-base" cx="50" cy="50" rx="38" ry="36" pathLength="100" />
         <ellipse
@@ -105,10 +102,6 @@ export function SignalField({
       </svg>
       <span className="signal-field__orbit signal-field__orbit--outer" />
       <span className="signal-field__orbit signal-field__orbit--inner" />
-      <span className="signal-field__bearing signal-field__bearing--north" aria-hidden="true">000</span>
-      <span className="signal-field__bearing signal-field__bearing--east" aria-hidden="true">090</span>
-      <span className="signal-field__bearing signal-field__bearing--south" aria-hidden="true">180</span>
-      <span className="signal-field__bearing signal-field__bearing--west" aria-hidden="true">270</span>
       <span
         className="signal-field__beacon"
         style={{ left: `${beaconPosition.x}%`, top: `${beaconPosition.y}%` } as CSSProperties}

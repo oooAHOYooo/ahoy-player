@@ -104,8 +104,6 @@
 
 .signal-field:focus-visible { outline: 2px solid var(--signal-accent, #e76b48); outline-offset: -0.35rem; }
 .signal-field__axis { position: absolute; top: 0; bottom: 0; left: 24%; width: 14%; background: var(--signal-accent, #e76b48); }
-.signal-field__chart { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; }
-.signal-field__chart path { fill: none; stroke: color-mix(in srgb, var(--signal-ink, #4d625c) 15%, transparent); stroke-width: 0.24; stroke-dasharray: 1 2.3; }
 .signal-field__wake {
   position: absolute;
   inset: 0;
@@ -128,11 +126,6 @@
 .signal-field__orbit { position: absolute; border: 1px solid var(--signal-ink, #4d625c); border-radius: 50%; pointer-events: none; }
 .signal-field__orbit--outer { width: 78%; height: 78%; top: 11%; left: 11%; }
 .signal-field__orbit--inner { width: 46%; height: 46%; top: 27%; left: 27%; border-width: 3px; }
-.signal-field__bearing { position: absolute; z-index: 2; color: color-mix(in srgb, var(--signal-ink, #4d625c) 76%, transparent); font: 600 0.38rem/1 ui-monospace, monospace; letter-spacing: 0.06em; pointer-events: none; }
-.signal-field__bearing--north { top: 0.7rem; left: 50%; transform: translateX(-50%); }
-.signal-field__bearing--east { top: 50%; right: 0.55rem; transform: translateY(-50%); }
-.signal-field__bearing--south { bottom: 1.3rem; left: 50%; transform: translateX(-50%); }
-.signal-field__bearing--west { top: 50%; left: 0.55rem; transform: translateY(-50%); }
 .signal-field__beacon {
   position: absolute;
   z-index: 2;

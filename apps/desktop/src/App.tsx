@@ -183,7 +183,7 @@ function DeckWindow({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
   return (
     <main className="deck-window" data-testid="deck-window">
       <header className="deck-window__header">
-        <div><strong>DECK</strong><span>HOME PORT / LOCAL</span></div>
+        <div><strong>AHOY MP3</strong><span>LOCAL PLAYER // 01</span></div>
         <p><i className={model.playback.status === "playing" ? "is-live" : ""} /> {model.playback.status}</p>
       </header>
 
@@ -199,7 +199,7 @@ function DeckWindow({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
       </section>
 
       <section className="deck-window__copy">
-        <p>CURRENT SIGNAL</p>
+        <p>NOW PLAYING</p>
         <h1>{track?.title ?? "Nothing queued"}</h1>
         <h2>{track ? `${track.artistName} / ${track.albumTitle}` : "Import a local MP3 in the library"}</h2>
       </section>
@@ -207,18 +207,18 @@ function DeckWindow({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
       <div className="deck-progress" aria-label="Playback progress">
         <span style={{ width: `${progress * 100}%` }} />
       </div>
-      <div className="deck-readout"><span>{formatTime(model.playback.positionMs)}</span><span>BEARING {String(Math.round(progress * 360) % 360).padStart(3, "0")}°</span><span>{formatTime(durationMs)}</span></div>
+      <div className="deck-readout"><span>{formatTime(model.playback.positionMs)}</span><span>LOCAL MP3</span><span>{formatTime(durationMs)}</span></div>
 
       <LocalSourcePanel track={track} />
 
       <section className="sweep" aria-label="Sweep transport">
-        <div className="sweep__heading"><span>CHANNEL</span><small>PORT / STARBOARD · SPACE / PLAY</small></div>
+        <div className="sweep__heading"><span>CONTROLS</span><small>← / → MOVE · SPACE PLAY</small></div>
         <div className="sweep__controls">
-          <button type="button" onClick={model.previousTrack} aria-label="Previous track"><span>←</span> PORT</button>
+          <button type="button" onClick={model.previousTrack} aria-label="Previous track"><span>←</span> PREV</button>
           <button className={`sweep__play${model.playback.status === "playing" ? " is-playing" : ""}`} type="button" onClick={model.togglePlayback}>
             {model.playback.status === "playing" ? "PAUSE" : "PLAY"}
           </button>
-          <button type="button" onClick={model.nextTrack} aria-label="Next track">STARBOARD <span>→</span></button>
+          <button type="button" onClick={model.nextTrack} aria-label="Next track">NEXT <span>→</span></button>
         </div>
       </section>
     </main>
@@ -250,8 +250,8 @@ function SidebarDataPanel({ model }: { model: ReturnType<typeof useAhoyPlayer> }
 function LocalSourcePanel({ track }: { track?: TrackRecord }) {
   if (!track || track.source.kind !== "local-file") return null;
   return (
-    <details className="local-source" open>
-      <summary>LOCAL DATA</summary>
+    <details className="local-source">
+      <summary>FILE INFO</summary>
       <dl>
         <div><dt>FILE</dt><dd>{track.source.filename}</dd></div>
         <div><dt>LOCATION</dt><dd>{localLocation(track)}</dd></div>
