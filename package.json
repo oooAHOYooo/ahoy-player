@@ -1,0 +1,23 @@
+{
+  "name": "ahoy-player",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local-first Ahoy Player monorepo with desktop, touch, TV, and future console shells.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:desktop": "npm run dev --workspace @ahoy/player-desktop",
+    "dev:web": "npm run dev --workspace @ahoy/player-web",
+    "dev:kiosk": "npm run dev --workspace @ahoy/player-linux-kiosk",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.30",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Ahoy Player",
+  "short_name": "Ahoy",
+  "description": "Local-first music library and Ahoy Dial player.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#11191a",
+  "theme_color": "#11191a",
+  "icons": [
+    {
+      "src": "/ahoy-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "@ahoy/player-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:renderer": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "build:electron": "tsc --project tsconfig.electron.json",
+    "build": "vite build && npm run build:electron",
+    "start": "electron .",
+    "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.electron.json --noEmit"
+  },
+  "dependencies": {
+    "@ahoy/player-core": "0.1.0",
+    "@ahoy/player-media-pipeline": "0.1.0",
+    "@ahoy/player-react": "0.1.0",
+    "@ahoy/player-ui-dial": "0.1.0",
+    "@ahoy/player-web-adapters": "0.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.30",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^33.4.11",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2"
+  }
+}

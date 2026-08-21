@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@ahoy/player-core": ["../../packages/core/src"],
+      "@ahoy/player-media-pipeline": ["../../packages/media-pipeline/src"],
+      "@ahoy/player-react": ["../../packages/player-react/src"],
+      "@ahoy/player-ui-dial": ["../../packages/ui-dial/src"],
+      "@ahoy/player-web-adapters": ["../../packages/web-adapters/src"]
+    }
+  },
+  "include": ["src"]
+}

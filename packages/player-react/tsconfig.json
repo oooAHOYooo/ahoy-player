@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@ahoy/player-core": ["../core/src"],
+      "@ahoy/player-media-pipeline": ["../media-pipeline/src"]
+    }
+  },
+  "include": ["src"]
+}

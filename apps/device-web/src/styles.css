@@ -1,0 +1,43 @@
+:root {
+  font-family: Inter, "Helvetica Neue", sans-serif;
+  color: #e9e5da;
+  background: #11191a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button { font: inherit; }
+.touch-shell { min-height: 100vh; max-width: 62rem; margin: auto; padding: 1rem; display: grid; grid-template-rows: auto minmax(20rem, 1fr) auto; gap: 1rem; background: #11191a; }
+.touch-header { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0; }
+.touch-header strong, .touch-header span { display: block; letter-spacing: 0.15em; }
+.touch-header strong { font-size: 0.82rem; }
+.touch-header span { color: #707a7b; font: 600 0.48rem/1.4 ui-monospace, monospace; }
+.touch-header button { border: 1px solid #525c5d; background: transparent; color: #e9e5da; padding: 0.6rem 0.9rem; }
+.touch-screen { min-height: 0; padding: 1.3rem; border: 1px solid #384143; background: #151e20; overflow: hidden; display: flex; flex-direction: column; }
+.touch-title { display: grid; grid-template-columns: 1fr auto; align-items: end; padding-bottom: 1rem; border-bottom: 1px solid #374042; }
+.touch-title p { grid-column: 1 / -1; margin: 0 0 0.4rem; color: #e76b48; font: 600 0.53rem/1 ui-monospace, monospace; letter-spacing: 0.13em; }
+.touch-title h1 { margin: 0; font: 400 clamp(2.3rem, 10vw, 4rem)/1 Georgia, serif; }
+.touch-title span { color: #788284; font: 500 0.56rem/1 ui-monospace, monospace; text-transform: uppercase; }
+.player-list { list-style: none; padding: 0; margin: 0; overflow: auto; }
+.player-list li { border-bottom: 1px solid #30393b; }
+.player-list__item { width: 100%; min-height: 4rem; display: grid; grid-template-columns: 2.2rem 1fr 1rem; gap: 0.55rem; align-items: center; border: 0; padding: 0.5rem; background: transparent; color: #aeb4b0; text-align: left; }
+.player-list__item.is-focused { background: #dfddd3; color: #151c1d; }
+.player-list__meta { font: 500 0.55rem/1 ui-monospace, monospace; color: #758082; }
+.player-list__copy strong, .player-list__copy small { display: block; }
+.player-list__copy strong { font: 500 0.98rem/1.1 Georgia, serif; }
+.player-list__copy small { margin-top: 0.28rem; opacity: 0.6; font-size: 0.58rem; text-transform: uppercase; }
+.player-list__mark { color: #e76b48; font-size: 0.48rem; opacity: 0; }
+.player-list__item.is-focused .player-list__mark { opacity: 1; }
+.touch-controls { padding: 1.2rem; display: flex; justify-content: space-between; gap: 1rem; align-items: center; border: 1px solid #384143; background: #0d1415; }
+.touch-now { min-width: 0; }
+.touch-now__signal { display: block; width: 2.5rem; height: 0.25rem; margin-bottom: 0.8rem; background: #e76b48; }
+.touch-now p { margin: 0; color: #697375; font: 600 0.52rem/1 ui-monospace, monospace; letter-spacing: 0.1em; }
+.touch-now h2 { margin: 0.45rem 0 0; font: 400 clamp(1.4rem, 6vw, 2.4rem)/1 Georgia, serif; }
+.touch-now small { display: block; margin-top: 0.4rem; color: #798385; text-transform: uppercase; }
+.touch-controls .ahoy-dial { flex: 0 0 auto; }
+@media (max-width: 580px) {
+  .touch-shell { min-height: 100svh; }
+  .touch-controls { padding: 1rem; }
+  .touch-controls .ahoy-dial { --dial-size: 9.5rem; }
+  .ahoy-dial button { font-size: 0.48rem; }
+}
