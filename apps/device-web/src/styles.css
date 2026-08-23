@@ -8,11 +8,16 @@
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button { font: inherit; }
 .touch-shell { min-height: 100vh; max-width: 62rem; margin: auto; padding: 1rem; display: grid; grid-template-rows: auto minmax(20rem, 1fr) auto; gap: 1rem; background: #11191a; }
-.touch-header { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0; }
+.touch-header { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0; gap: 1rem; }
+.touch-header__actions { display: flex; gap: 0.5rem; align-items: center; }
 .touch-header strong, .touch-header span { display: block; letter-spacing: 0.15em; }
 .touch-header strong { font-size: 0.82rem; }
 .touch-header span { color: #707a7b; font: 600 0.48rem/1.4 ui-monospace, monospace; }
-.touch-header button { border: 1px solid #525c5d; background: transparent; color: #e9e5da; padding: 0.6rem 0.9rem; }
+.touch-header button { border: 1px solid #525c5d; background: transparent; color: #e9e5da; padding: 0.6rem 0.9rem; cursor: pointer; }
+.touch-header button:hover { border-color: #64c0f5; }
+.touch-header button:active { transform: translateY(2px); }
+.touch-install { border-color: #64c0f5 !important; color: #64c0f5 !important; }
+.touch-import { background: linear-gradient(180deg, #ff5b97, #ff0060) !important; border-color: #ff80ad !important; color: white !important; box-shadow: 0 3px 0 #c9004d; }
 .touch-screen { min-height: 0; padding: 1.3rem; border: 1px solid #384143; background: #151e20; overflow: hidden; display: flex; flex-direction: column; }
 .touch-title { display: grid; grid-template-columns: 1fr auto; align-items: end; padding-bottom: 1rem; border-bottom: 1px solid #374042; }
 .touch-title p { grid-column: 1 / -1; margin: 0 0 0.4rem; color: #e76b48; font: 600 0.53rem/1 ui-monospace, monospace; letter-spacing: 0.13em; }
@@ -34,6 +39,7 @@ button { font: inherit; }
 .touch-now p { margin: 0; color: #697375; font: 600 0.52rem/1 ui-monospace, monospace; letter-spacing: 0.1em; }
 .touch-now h2 { margin: 0.45rem 0 0; font: 400 clamp(1.4rem, 6vw, 2.4rem)/1 Georgia, serif; }
 .touch-now small { display: block; margin-top: 0.4rem; color: #798385; text-transform: uppercase; }
+.touch-now__storage { display: block; margin-top: 0.7rem; color: #64c0f5; font: 600 0.48rem/1 ui-monospace, monospace; letter-spacing: 0.08em; }
 .touch-controls .ahoy-dial { flex: 0 0 auto; }
 @media (max-width: 580px) {
   .touch-shell { min-height: 100svh; }

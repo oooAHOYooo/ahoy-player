@@ -64,6 +64,7 @@ packages/
 docs/
   stack-and-architecture.md
   ecosystem-architecture.md
+  mvp-web-checklist.md
   megaprompts.md     historical design input, not build instructions
 ```
 
@@ -108,3 +109,4 @@ Only normalized library metadata and opaque locators are persisted in the player
 
 See [stack-and-architecture.md](./docs/stack-and-architecture.md) for the shared/platform boundary and contract locations.
 See [ecosystem-architecture.md](./docs/ecosystem-architecture.md) for the AHOY domains, identity, library, player, and NFC-card model.
+See [mvp-web-checklist.md](./docs/mvp-web-checklist.md) for the current web deployment boundary and acceptance test.
