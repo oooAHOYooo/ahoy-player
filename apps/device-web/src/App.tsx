@@ -3,13 +3,13 @@ import { PlayerList, screenLabels, useAhoyPlayer } from "@ahoy/player-react";
 import { AhoyDial, useAhoyInput } from "@ahoy/player-ui-dial";
 import {
   BrowserFileImportAdapter,
+  BrowserAudioPlaybackAdapter,
   LocalStoragePersistenceAdapter,
-  SimulatedPlaybackAdapter
 } from "@ahoy/player-web-adapters";
 
 const fileImport = new BrowserFileImportAdapter();
 const persistence = new LocalStoragePersistenceAdapter("ahoy-player:web:v1");
-const playbackAdapter = new SimulatedPlaybackAdapter();
+const playbackAdapter = new BrowserAudioPlaybackAdapter();
 
 export function App() {
   const model = useAhoyPlayer({ initialLibrary: demoLibrary, fileImport, persistence, playbackAdapter });

@@ -110,6 +110,28 @@ GET  /api/cards/{card_id}
 
 Responses should use opaque public IDs, checksums, metadata, and short-lived download authorization. Storage paths, private bucket URLs, session secrets, and internal numeric IDs should remain server-side.
 
+## Web-first deployment path
+
+The first public deployment target is the web player, not Google Play or an arbitrary television USB port. The web app should become a usable installable PWA first:
+
+- import MP3 files in the browser
+- play them through the browser audio engine
+- persist normalized metadata and playback state locally
+- continue working offline after the app shell has been cached
+- make the limitation clear that browser-selected files must be re-imported after a browser session ends
+
+The web player is the proving ground for the shared library, Dial, touch controls, keyboard controls, and real playback adapter. Android/Google TV packaging and a physical NFC reader come after this path is stable.
+
+A USB stick cannot make arbitrary software execute on any television. The later TV product should be one of:
+
+```text
+USB + small Linux/Android player computer + TV HDMI
+Android TV app installed on a supported device
+Dedicated Ahoy Player hardware with storage, NFC reader, and HDMI
+```
+
+The current Linux kiosk shell can eventually become a bootable USB image for a compatible small computer. It should not be described as a TV-compatible USB app until a target hardware profile and boot process are tested.
+
 ## Repository and deployment strategy
 
 Separate repositories are reasonable because the existing sites have different release and deployment lifecycles. They should still share one documented identity and API contract rather than copying auth, users, or entitlement logic.
@@ -118,12 +140,13 @@ The current player repository is the implementation home for the local player an
 
 Recommended sequence:
 
-1. Establish the public AHOY ID and central account contract.
-2. Add digital asset and entitlement records to the canonical platform.
-3. Build library sync and download authorization.
-4. Replace the player’s simulated playback adapter with a real local audio adapter.
+1. Make the web player usable with real browser audio and local imports.
+2. Establish the public AHOY ID and central account contract.
+3. Add digital asset and entitlement records to the canonical platform.
+4. Build library sync and download authorization.
 5. Add device pairing and NFC card resolution.
-6. Package the player and validate the physical USB/NFC workflow.
+6. Package Android/Google TV or a Linux USB image for a defined hardware target.
+7. Validate the physical USB/NFC workflow.
 
 ## Non-goals
 

@@ -2,7 +2,7 @@
 
 Ahoy Player is one local-first music product with separate platform hosts. Its shared behavior lives in TypeScript packages; Electron, the touch PWA, the Linux TV kiosk, and a future Xbox host each own their platform APIs.
 
-The first milestone imports MP3 files, reads embedded ID3 metadata locally, fills any missing labels from filenames and folders, detects duplicates, persists library metadata, and drives every screen through the same Ahoy Dial action model. Playback state is working; audio output remains behind the `PlaybackAdapter` boundary and uses a simulated adapter in this milestone.
+The first milestone imports MP3 files, reads embedded ID3 metadata locally, fills any missing labels from filenames and folders, detects duplicates, persists library metadata, and drives every screen through the same Ahoy Dial action model. The web host now plays imported files through the browser audio engine; desktop and kiosk hosts still use the simulated adapter until their native playback paths are connected.
 
 ## Run it
 
@@ -98,9 +98,9 @@ Keyboard and remote-style arrows turn the current list, Enter selects, Escape/Ba
 
 ### Persistence and playback
 
-`PlayerSnapshot` is shared; desktop, PWA, and kiosk currently persist it through host-keyed localStorage adapters. The adapter's optional subscription channel keeps the desktop library and Deck popup synchronized in both directions. The playback queue and state machine are shared pure reducers. `SimulatedPlaybackAdapter` proves the port; a future Web Audio, HTML Audio, or native backend can replace it without changing library/navigation behavior.
+`PlayerSnapshot` is shared; desktop, PWA, and kiosk currently persist it through host-keyed localStorage adapters. The adapter's optional subscription channel keeps the desktop library and Deck popup synchronized in both directions. The playback queue and state machine are shared pure reducers. The web host uses `BrowserAudioPlaybackAdapter` with browser object URLs; desktop and kiosk still use `SimulatedPlaybackAdapter` pending native playback work.
 
-Only normalized library metadata and opaque locators are persisted. Browser `File` objects are not retained across sessions yet.
+Only normalized library metadata and opaque locators are persisted. Browser `File` objects are not retained across sessions yet, so browser-imported files must be re-imported after the tab/session loses its in-memory file handles.
 
 ## Verification
 
