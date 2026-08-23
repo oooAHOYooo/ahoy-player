@@ -1,0 +1,12 @@
+services:
+  - type: static_site
+    name: ahoy-player
+    runtime: static
+    buildCommand: npm ci && npm run build --workspace @ahoy/player-web
+    staticPublishPath: apps/device-web/dist
+    previews:
+      generation: automatic
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

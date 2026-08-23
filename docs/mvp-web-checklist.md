@@ -40,3 +40,14 @@ The web MVP does not upload private MP3 files to AHOY. The files remain in brows
 6. Close and reopen the installed app and confirm the library remains available.
 
 The next MVP increment should add a small AHOY card landing route that resolves a public card ID and offers “Add to my library” after account/entitlement support exists.
+
+## Render preview
+
+The repository includes `render.yaml` for a Render Static Site. In the Render Dashboard, choose **New → Blueprint** and select the `oooAHOYooo/ahoy-player` repository. Render will use:
+
+```text
+Build: npm ci && npm run build --workspace @ahoy/player-web
+Publish: apps/device-web/dist
+```
+
+After the first deploy, add `player.ahoy.ooo` as a custom domain in the service settings. Add a link to that URL from `ahoy.ooo` and `app.ahoy.ooo`. The wildcard rewrite in the blueprint keeps future client-side routes working.
