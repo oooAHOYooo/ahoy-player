@@ -212,7 +212,7 @@ function DeckWindow({ model }: { model: ReturnType<typeof useAhoyPlayer> }) {
       <LocalSourcePanel track={track} />
 
       <section className="sweep" aria-label="Sweep transport">
-        <div className="sweep__heading"><span>CONTROLS</span><small>← / → MOVE · SPACE PLAY</small></div>
+        <div className="sweep__heading"><span>CONTROLS</span><small>TURN · PRESS · HOLD</small></div>
         <div className="sweep__controls">
           <button type="button" onClick={model.previousTrack} aria-label="Previous track"><span>←</span> PREV</button>
           <button className={`sweep__play${model.playback.status === "playing" ? " is-playing" : ""}`} type="button" onClick={model.togglePlayback}>

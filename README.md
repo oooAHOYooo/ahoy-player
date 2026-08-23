@@ -63,6 +63,7 @@ packages/
   web-adapters/     browser picker, localStorage, and simulated playback adapters
 docs/
   stack-and-architecture.md
+  ecosystem-architecture.md
   megaprompts.md     historical design input, not build instructions
 ```
 
@@ -106,3 +107,4 @@ Only normalized library metadata and opaque locators are persisted. Browser `Fil
 `npm test` covers filename parsing, path fallbacks, fingerprint keys, existing-library duplicates, same-batch duplicates, and invalid inputs. `npm run typecheck` checks every workspace, including Electron main/preload code. `npm run build` builds all three implemented hosts.
 
 See [stack-and-architecture.md](./docs/stack-and-architecture.md) for the shared/platform boundary and contract locations.
+See [ecosystem-architecture.md](./docs/ecosystem-architecture.md) for the AHOY domains, identity, library, player, and NFC-card model.
