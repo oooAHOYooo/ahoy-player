@@ -6,9 +6,9 @@ import {
   type TrackRecord,
   type Unsubscribe
 } from "@ahoy/player-core";
-import { browserFileUrl } from "./browser-files";
+import { browserFileUrl } from "./browser-media-store";
 
-/** Real browser audio for imported files. Files remain available for the current tab session. */
+/** Real browser audio for imported files persisted in the browser media store. */
 export class BrowserAudioPlaybackAdapter implements PlaybackAdapter {
   private readonly audio = new Audio();
   private state = createInitialPlaybackState();
@@ -31,9 +31,9 @@ export class BrowserAudioPlaybackAdapter implements PlaybackAdapter {
       this.update(reducePlayback(this.state, { type: "set-error", message: "This purchase is not available in the web player yet." }));
       return;
     }
-    const source = browserFileUrl(track.source.locator);
+    const source = await browserFileUrl(track.source.locator);
     if (!source) {
-      this.update(reducePlayback(this.state, { type: "set-error", message: "Re-import this file to play it in the browser." }));
+      this.update(reducePlayback(this.state, { type: "set-error", message: "This browser no longer has the imported file." }));
       return;
     }
     this.audio.src = source;

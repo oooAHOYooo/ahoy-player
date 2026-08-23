@@ -1,7 +1,6 @@
 import type { FileImportAdapter, ImportCandidate } from "@ahoy/player-core";
 import { parseBlob } from "music-metadata";
-
-const browserFileUrls = new Map<string, string>();
+import { saveBrowserFile } from "./browser-media-store";
 
 export class BrowserFileImportAdapter implements FileImportAdapter {
   readonly availability = "available" as const;
@@ -15,10 +14,7 @@ export class BrowserFileImportAdapter implements FileImportAdapter {
 export async function candidatesFromFiles(files: File[] | FileList): Promise<ImportCandidate[]> {
   return Promise.all(Array.from(files).map(async (file) => {
     const sourceLocator = `browser-file:${file.name}:${file.lastModified}:${file.size}`;
-    const previousUrl = browserFileUrls.get(sourceLocator);
-    if (previousUrl) URL.revokeObjectURL(previousUrl);
-    browserFileUrls.set(sourceLocator, URL.createObjectURL(file));
-    const [fingerprint, audioDetails] = await Promise.all([sha256(file), readAudioDetails(file)]);
+    const [fingerprint, audioDetails] = await Promise.all([sha256(file), readAudioDetails(file), saveBrowserFile(sourceLocator, file)]);
     return {
       filename: file.name,
       sourceLocator,
@@ -30,11 +26,6 @@ export async function candidatesFromFiles(files: File[] | FileList): Promise<Imp
       ...audioDetails
     };
   }));
-}
-
-/** Resolves a browser-imported file for the current session. Browser File objects are not persisted. */
-export function browserFileUrl(sourceLocator: string): string | undefined {
-  return browserFileUrls.get(sourceLocator);
 }
 
 async function openFilePicker(): Promise<File[]> {

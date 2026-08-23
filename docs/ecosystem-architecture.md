@@ -116,11 +116,17 @@ The first public deployment target is the web player, not Google Play or an arbi
 
 - import MP3 files in the browser
 - play them through the browser audio engine
-- persist normalized metadata and playback state locally
+- persist normalized metadata, playback state, and imported file blobs locally through IndexedDB
 - continue working offline after the app shell has been cached
-- make the limitation clear that browser-selected files must be re-imported after a browser session ends
+- explain that browser storage can still be cleared or evicted
 
 The web player is the proving ground for the shared library, Dial, touch controls, keyboard controls, and real playback adapter. Android/Google TV packaging and a physical NFC reader come after this path is stable.
+
+### Browser media persistence
+
+The current web adapter stores imported `File` blobs in an IndexedDB database named `ahoy-player-media`, keyed by the same opaque browser-file locator stored in the normalized library. Playback creates object URLs only when needed. This survives ordinary reloads and PWA restarts without uploading music to AHOY.
+
+IndexedDB is the first practical browser solution because it works without a special permission prompt and supports ordinary file-picker imports. It is not an absolute archival guarantee: users can clear site data, private browsing can discard it, and browsers may evict storage under pressure. The File System Access API can later add explicit folder handles and better large-library workflows where supported.
 
 A USB stick cannot make arbitrary software execute on any television. The later TV product should be one of:
 

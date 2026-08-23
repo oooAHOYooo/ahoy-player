@@ -100,7 +100,7 @@ Keyboard and remote-style arrows turn the current list, Enter selects, Escape/Ba
 
 `PlayerSnapshot` is shared; desktop, PWA, and kiosk currently persist it through host-keyed localStorage adapters. The adapter's optional subscription channel keeps the desktop library and Deck popup synchronized in both directions. The playback queue and state machine are shared pure reducers. The web host uses `BrowserAudioPlaybackAdapter` with browser object URLs; desktop and kiosk still use `SimulatedPlaybackAdapter` pending native playback work.
 
-Only normalized library metadata and opaque locators are persisted. Browser `File` objects are not retained across sessions yet, so browser-imported files must be re-imported after the tab/session loses its in-memory file handles.
+Only normalized library metadata and opaque locators are persisted in the player snapshot. The web adapter also stores imported browser `File` blobs in IndexedDB, so normal browser reloads and PWA restarts can continue to play them. Browser storage can still be cleared or evicted by the user/browser; the File System Access API remains a future enhancement for explicit folder permissions and larger libraries.
 
 ## Verification
 
