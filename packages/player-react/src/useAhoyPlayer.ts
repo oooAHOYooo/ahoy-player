@@ -45,6 +45,7 @@ export type AhoyPlayerModel = {
   activate: (index: number) => void;
   openScreen: (screen: PlayerScreen) => void;
   importFiles: () => Promise<void>;
+  playTrack: (trackId: string) => void;
   togglePlayback: () => void;
   seek: (positionMs: number) => void;
   nextTrack: () => void;
@@ -251,6 +252,7 @@ export function useAhoyPlayer({
     activate,
     openScreen,
     importFiles,
+    playTrack,
     togglePlayback,
     seek,
     nextTrack,

@@ -1,77 +1,88 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { demoLibrary } from "@ahoy/player-core";
-import { PlayerList, screenLabels, useAhoyPlayer } from "@ahoy/player-react";
 import { AhoyDial, useAhoyInput } from "@ahoy/player-ui-dial";
-import {
-  BrowserFileImportAdapter,
-  BrowserAudioPlaybackAdapter,
-  LocalStoragePersistenceAdapter,
-} from "@ahoy/player-web-adapters";
+import { BrowserAudioPlaybackAdapter, BrowserFileImportAdapter, LocalStoragePersistenceAdapter } from "@ahoy/player-web-adapters";
+import { useAhoyPlayer } from "@ahoy/player-react";
 
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-};
-
+type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void> };
 const fileImport = new BrowserFileImportAdapter();
 const persistence = new LocalStoragePersistenceAdapter("ahoy-player:web:v1");
 const playbackAdapter = new BrowserAudioPlaybackAdapter();
 
 export function App() {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [search, setSearch] = useState("");
+  const [volume, setVolume] = useState(72);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [workspaceView, setWorkspaceView] = useState<"library" | "customize">("library");
+  const [accent, setAccent] = useState({ name: "Signal blue", hex: "#0a84ff", rgb: "10,132,255" });
+  const [glass, setGlass] = useState(68);
+  const [blur, setBlur] = useState(24);
+  const [ambientGlow, setAmbientGlow] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [transferView, setTransferView] = useState<"past" | "new" | "send">("past");
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const model = useAhoyPlayer({ initialLibrary: demoLibrary, fileImport, persistence, playbackAdapter });
   useAhoyInput(model.dispatchDial, { gamepad: true });
+  useEffect(() => { const onBeforeInstall = (event: Event) => { event.preventDefault(); setInstallEvent(event as BeforeInstallPromptEvent); }; window.addEventListener("beforeinstallprompt", onBeforeInstall); return () => window.removeEventListener("beforeinstallprompt", onBeforeInstall); }, []);
+  const tracks = useMemo(() => model.library.tracks.filter((track) => { const term = search.trim().toLowerCase(); return !term || `${track.title} ${track.artistName} ${track.albumTitle}`.toLowerCase().includes(term); }), [model.library.tracks, search]);
+  const currentIndex = model.library.tracks.findIndex((track) => track.id === model.nowPlaying?.id);
+  const duration = model.playback.durationMs ?? model.nowPlaying?.durationMs ?? 0;
+  const progress = duration ? Math.min(100, (model.playback.positionMs / duration) * 100) : 0;
+  function playTrack(index: number) { const track = model.library.tracks[index]; if (!track) return; model.openScreen("library"); model.playTrack(track.id); }
+  async function install() { if (!installEvent) return; await installEvent.prompt(); setInstallEvent(null); }
 
-  useEffect(() => {
-    const onBeforeInstall = (event: Event) => {
-      event.preventDefault();
-      setInstallEvent(event as BeforeInstallPromptEvent);
-    };
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstall);
-  }, []);
-
-  async function install() {
-    if (!installEvent) return;
-    await installEvent.prompt();
-    setInstallEvent(null);
-  }
-
-  return (
-    <main className="touch-shell">
-      <header className="touch-header">
-        <div><strong>AHOY</strong><span>PLAYER</span></div>
-        <div className="touch-header__actions">
-          {installEvent && <button className="touch-install" type="button" onClick={() => void install()}>Install</button>}
-          <button className="touch-import" type="button" onClick={() => void model.importFiles()}>
-            {model.isImporting ? "Reading" : "Import MP3"}
-          </button>
-        </div>
-      </header>
-
-      <section className="touch-screen">
-        <div className="touch-title">
-          <p>LOCAL LIBRARY</p>
-          <h1>{screenLabels[model.navigation.screen]}</h1>
-          <span>{model.library.tracks.length} tracks</span>
-        </div>
-        <PlayerList
-          items={model.items}
-          focusIndex={model.navigation.focusIndex}
-          onActivate={model.activate}
-          emptyLabel="No local files"
-        />
-      </section>
-
-      <section className="touch-controls">
-        <div className="touch-now">
-          <span className="touch-now__signal" />
-          <p>NOW PLAYING</p>
-          <h2>{model.nowPlaying?.title ?? "Nothing queued"}</h2>
-          <small>{model.nowPlaying?.artistName ?? "Import an MP3"}</small>
-          <span className="touch-now__storage">STORED ON THIS DEVICE</span>
-        </div>
-        <AhoyDial dispatch={model.dispatchDial} isPlaying={model.playback.status === "playing"} size="compact" />
-      </section>
-    </main>
-  );
+  const shellStyle = { "--user-accent": accent.hex, "--user-accent-rgb": accent.rgb, "--glass-opacity": glass / 100, "--glass-blur": `${blur}px` } as React.CSSProperties;
+  return <main className={`app-shell theme-${theme} ${ambientGlow ? "has-ambient-glow" : ""} ${sidebarOpen ? "" : "sidebar-collapsed"} ${inspectorOpen ? "inspector-open" : ""}`} style={shellStyle}>
+    <aside className="sidebar">
+      <div className="brand"><span className="brand-mark"><img src="/nautical-seagull-silkscreen.png" alt="Nautical seagull mark" /></span><span><strong>AHOY</strong><small>LOCAL PLAYER</small></span></div>
+      <p className="sidebar-label">YOUR LIBRARY</p>
+      <nav className="library-nav" aria-label="Library views">
+        <NavButton active={model.navigation.screen === "library"} onClick={() => model.openScreen("library")} label="Library" count={model.library.tracks.length} />
+        <NavButton active={model.navigation.screen === "artists"} onClick={() => model.openScreen("artists")} label="Artists" count={model.library.artists.length} />
+        <NavButton active={model.navigation.screen === "albums"} onClick={() => model.openScreen("albums")} label="Albums" count={model.library.albums.length} />
+        <NavButton active={model.navigation.screen === "imports"} onClick={() => model.openScreen("imports")} label="Recently added" count={model.library.imports.length} />
+      </nav>
+      <p className="sidebar-label sidebar-label--spaced">PLAYLISTS</p>
+      <div className="playlist-links"><button type="button">◈  All music</button><button type="button">＋  New playlist</button><button type="button" className={workspaceView === "customize" ? "is-customize-active" : ""} onClick={() => setWorkspaceView("customize")}>⌘  Customize</button></div>
+      <p className="sidebar-label sidebar-label--spaced transfers-label">TRANSFERS</p>
+      <div className="transfer-links"><button className={transferView === "past" ? "is-active" : ""} type="button" onClick={() => setTransferView("past")}><span>↗  Past transfers</span><small>0</small></button><button className={transferView === "new" ? "is-active" : ""} type="button" onClick={() => setTransferView("new")}><span>＋  New transfer</span></button><button className={transferView === "send" ? "is-active" : ""} type="button" onClick={() => setTransferView("send")}><span>↑  Send</span></button></div>
+      <div className="sidebar-footer"><span className="storage-dot" /><span>Local storage<br /><strong>{model.library.tracks.length} tracks ready</strong></span></div>
+    </aside>
+    <section className="workspace">
+      <div className="desktop-menubar"><div className="app-menu">{["File", "Edit", "View", "Playback", "Window", "Help"].map((menu) => <div className="menu-anchor" key={menu}><button className={openMenu === menu ? "is-open" : ""} type="button" onClick={() => setOpenMenu(openMenu === menu ? null : menu)} aria-haspopup="menu" aria-expanded={openMenu === menu}>{menu}</button>{openMenu === menu && <MenuPopover menu={menu} onClose={() => setOpenMenu(null)} onImport={() => void model.importFiles()} onCustomize={() => { setWorkspaceView("customize"); setOpenMenu(null); }} onToggleSidebar={() => { setSidebarOpen(!sidebarOpen); setOpenMenu(null); }} onToggleInspector={() => { setInspectorOpen(!inspectorOpen); setOpenMenu(null); }} onToggleTheme={() => { setTheme(theme === "light" ? "dark" : "light"); setOpenMenu(null); }} onPrevious={model.previousTrack} onPlayPause={model.togglePlayback} onNext={model.nextTrack} />}</div>)}</div><span className="window-title">Ahoy Player</span><button className="inspector-button" type="button" onClick={() => setInspectorOpen(!inspectorOpen)} aria-pressed={inspectorOpen}>{inspectorOpen ? "Hide inspector" : "Inspector"}</button></div>
+      <div className="desktop-toolbar"><div className="toolbar-group"><button type="button" onClick={() => model.dispatchDial({ type: "back", source: "pointer" })} aria-label="Back">‹</button><button type="button" onClick={() => model.openScreen("library")} aria-label="Forward">›</button><button type="button" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle sidebar">▤</button></div><div className="toolbar-divider" /><div className="toolbar-group toolbar-playback"><button type="button" onClick={model.previousTrack} aria-label="Previous track">|◀</button><button type="button" onClick={model.togglePlayback} aria-label="Toolbar play pause">{model.playback.status === "playing" ? "Ⅱ" : "▶"}</button><button type="button" onClick={model.nextTrack} aria-label="Next track">▶|</button></div><div className="toolbar-status"><span className={model.playback.status === "playing" ? "is-live" : ""} />{model.playback.status === "playing" ? "Playing" : "Ready"}<b>{model.library.tracks.length} tracks</b></div></div>
+      <header className="topbar"><div className="breadcrumbs"><span>{workspaceView === "customize" ? "AHOY" : "LIBRARY"}</span><b>/</b><strong>{workspaceView === "customize" ? "Customize" : model.navigation.screen === "home" ? "Overview" : model.navigation.screen}</strong></div><div className="topbar-actions">{workspaceView === "library" && <label className="search-box"><span>⌕</span><input aria-label="Search library" placeholder="Search your library" value={search} onChange={(event) => setSearch(event.target.value)} /><kbd>⌘ K</kbd></label>}<button className="appearance-button" type="button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "◐" : "○"}<span>{theme === "light" ? "Dark" : "Light"}</span></button>{workspaceView === "library" && <button className="outline-button" type="button" onClick={() => setWorkspaceView("customize")}>Customize</button>}{installEvent && <button className="outline-button" type="button" onClick={() => void install()}>Install app</button>}{workspaceView === "library" && <button className="import-button" type="button" onClick={() => void model.importFiles()}>{model.isImporting ? "Reading…" : "＋ Import music"}</button>}</div></header>
+      {workspaceView === "customize" ? <CustomizeView theme={theme} accent={accent} setAccent={setAccent} glass={glass} setGlass={setGlass} blur={blur} setBlur={setBlur} ambientGlow={ambientGlow} setAmbientGlow={setAmbientGlow} onBack={() => setWorkspaceView("library")} /> : <><ClassicPlayer model={model} duration={duration} progress={progress} /><div className="content">
+        <section className="hero-row"><div><p className="eyebrow">GOOD EVENING, LISTENER</p><h1>Your music,<br /><em>in its place.</em></h1><p className="hero-copy">A private library for the music you keep close.</p></div><div className="orbit-orb" aria-hidden="true"><span>AHOY<br /><small>LOCAL / 01</small></span></div></section>
+        <div className="section-head"><div><p className="eyebrow">COLLECTION</p><h2>{model.navigation.screen === "home" ? "All music" : titleCase(model.navigation.screen)}</h2></div><div className="view-tools"><span>{tracks.length} tracks</span><button className="view-button is-active" type="button" aria-label="List view">☷</button><button className="view-button" type="button" aria-label="Grid view">▦</button></div></div>
+        <div className="track-table" aria-label="Music library"><div className="table-head"><span>#</span><span>TITLE</span><span>ALBUM</span><span>TIME</span><span /></div>{tracks.map((track, index) => { const originalIndex = model.library.tracks.findIndex((item) => item.id === track.id); const isCurrent = track.id === model.nowPlaying?.id; return <button className={`track-row${isCurrent ? " is-current" : ""}`} type="button" key={track.id} onClick={() => playTrack(originalIndex)}><span className="track-number">{isCurrent && model.playback.status === "playing" ? <i className="equalizer"><b /><b /><b /></i> : String(index + 1).padStart(2, "0")}</span><span className="track-title"><span className="mini-art">{String(index + 1).padStart(2, "0")}</span><span><strong>{track.title}</strong><small>{track.artistName}</small></span></span><span className="track-album">{track.albumTitle}</span><span className="track-time">{formatTime(track.durationMs ?? 0)}</span><span className="track-more">•••</span></button>; })}{tracks.length === 0 && <div className="empty-state">No music matches “{search}”.</div>}</div>
+      </div></>}
+    </section>
+    <section className="player-deck" aria-label="Now playing"><div className="deck-track"><div className="deck-art">{model.nowPlaying ? "A" : "—"}</div><div><strong>{model.nowPlaying?.title ?? "Nothing playing"}</strong><span>{model.nowPlaying?.artistName ?? "Choose a track from your library"}</span></div><button className="heart-button" type="button" aria-label="Favorite">♡</button></div><div className="deck-controls"><div className="transport"><button type="button" onClick={model.previousTrack} aria-label="Previous">|◀</button><button className="play-button" type="button" onClick={model.togglePlayback} aria-label={model.playback.status === "playing" ? "Pause" : "Play"}>{model.playback.status === "playing" ? "Ⅱ" : "▶"}</button><button type="button" onClick={model.nextTrack} aria-label="Next">▶|</button></div><div className="scrubber"><div className="time-line"><span>{formatTime(model.playback.positionMs)}</span><input aria-label="Playback position" type="range" min="0" max={Math.max(1, duration)} value={Math.min(model.playback.positionMs, duration || 1)} onChange={(event) => model.seek(Number(event.target.value))} style={{ "--progress": `${progress}%` } as React.CSSProperties} /><span>{formatTime(duration)}</span></div><div className="waveform" aria-hidden="true">{Array.from({ length: 48 }, (_, index) => <i key={index} style={{ height: `${18 + ((index * 17) % 55)}%` }} />)}</div></div></div><div className="deck-tools"><button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className={isQueueOpen ? "is-active" : ""}>☷ <span>Queue</span></button><label className="volume"><span>◖</span><input aria-label="Volume" type="range" min="0" max="100" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /></label><button type="button" onClick={() => model.openScreen("now-playing")}>Expand ↗</button></div>{isQueueOpen && <div className="queue-popover"><strong>UP NEXT</strong><span>{Math.max(0, model.library.tracks.length - currentIndex - 1)} tracks in queue</span><button type="button" onClick={() => setIsQueueOpen(false)}>Close</button></div>}</section>
+    <div className="dial-dock"><AhoyDial dispatch={model.dispatchDial} isPlaying={model.playback.status === "playing"} size="compact" /></div>
+    {inspectorOpen && <aside className="inspector-panel"><div><p className="eyebrow">INSPECTOR</p><h2>{model.nowPlaying?.title ?? "Library details"}</h2></div><dl><dt>Source</dt><dd>{model.nowPlaying?.source.kind === "local-file" ? "Local file" : "Ahoy library"}</dd><dt>Tracks in queue</dt><dd>{model.playback.queue.length}</dd><dt>Storage</dt><dd>On this device</dd></dl><button type="button" onClick={() => setInspectorOpen(false)}>Done</button></aside>}
+  </main>;
 }
+function NavButton({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count: number }) { return <button className={`nav-button${active ? " is-active" : ""}`} type="button" onClick={onClick}><span>{label}</span><small>{count}</small></button>; }
+function MenuPopover({ menu, onClose, onImport, onCustomize, onToggleSidebar, onToggleInspector, onToggleTheme, onPrevious, onPlayPause, onNext }: { menu: string; onClose: () => void; onImport: () => void; onCustomize: () => void; onToggleSidebar: () => void; onToggleInspector: () => void; onToggleTheme: () => void; onPrevious: () => void; onPlayPause: () => void; onNext: () => void }) {
+  const actions: Record<string, Array<[string, () => void]>> = {
+    File: [["Import music", onImport], ["Customize player", onCustomize]],
+    Edit: [["Customize player", onCustomize]],
+    View: [["Toggle sidebar", onToggleSidebar], ["Toggle inspector", onToggleInspector], ["Switch appearance", onToggleTheme]],
+    Playback: [["Previous track", onPrevious], ["Play / pause", onPlayPause], ["Next track", onNext]],
+    Window: [["Toggle inspector", onToggleInspector], ["Customize player", onCustomize]],
+    Help: [["Open inspector", onToggleInspector], ["Customize player", onCustomize]],
+  };
+  return <div className="menu-popover" role="menu" aria-label={`${menu} menu`}>{(actions[menu] ?? []).map(([label, action]) => <button key={label} type="button" role="menuitem" onClick={() => { action(); onClose(); }}>{label}</button>)}</div>;
+}
+function ClassicPlayer({ model, duration, progress }: { model: ReturnType<typeof useAhoyPlayer>; duration: number; progress: number }) { const currentIndex = model.library.tracks.findIndex((track) => track.id === model.nowPlaying?.id); const next = model.library.tracks.slice(Math.max(0, currentIndex + 1), currentIndex + 3); return <section className="classic-player" aria-label="Classic player"><div className="classic-screen"><div className="classic-time">{formatTime(model.playback.positionMs)}</div><div className="classic-signal"><span>{model.playback.status === "playing" ? "PLAYING" : model.playback.status.toUpperCase()}</span><small>{Math.round(progress)}% · {model.nowPlaying?.source.kind === "local-file" ? "LOCAL FILE" : "AHOY LIBRARY"}</small></div><div className="classic-meter">{Array.from({ length: 24 }, (_, index) => <i key={index} style={{ height: `${16 + ((index * 19) % 70)}%` }} />)}</div></div><div className="classic-art" aria-hidden="true">{model.nowPlaying ? <img src="/nautical-seagull-silkscreen.png" alt="" /> : "—"}</div><div className="classic-copy"><span className="classic-kicker">NOW PLAYING</span><strong>{model.nowPlaying?.title ?? "Nothing queued"}</strong><span>{model.nowPlaying?.artistName ?? "Choose a track from your library"}</span><small>{model.nowPlaying?.albumTitle ?? "Ahoy Player"}</small><div className="classic-buttons"><button type="button" onClick={model.previousTrack} aria-label="Classic previous">|◀</button><button type="button" onClick={model.togglePlayback} aria-label="Classic play pause">{model.playback.status === "playing" ? "Ⅱ" : "▶"}</button><button type="button" onClick={model.nextTrack} aria-label="Classic next">▶|</button><input aria-label="Classic seek" type="range" min="0" max={Math.max(1, duration)} value={Math.min(model.playback.positionMs, duration || 1)} onChange={(event) => model.seek(Number(event.target.value))} /></div></div><div className="classic-queue"><span>UP NEXT</span>{next.length ? next.map((track) => <button key={track.id} type="button" onClick={() => model.playTrack(track.id)}><b>{String((track.trackNumber ?? 0)).padStart(2, "0")}</b><span>{track.title}<small>{track.artistName}</small></span></button>) : <small>Queue is clear</small>}</div></section>; }
+function CustomizeView({ theme, accent, setAccent, glass, setGlass, blur, setBlur, ambientGlow, setAmbientGlow, onBack }: { theme: "light" | "dark"; accent: { name: string; hex: string; rgb: string }; setAccent: (accent: { name: string; hex: string; rgb: string }) => void; glass: number; setGlass: (value: number) => void; blur: number; setBlur: (value: number) => void; ambientGlow: boolean; setAmbientGlow: (value: boolean) => void; onBack: () => void }) {
+  const swatches = [{ name: "Signal blue", hex: "#0a84ff", rgb: "10,132,255" }, { name: "Deep ocean", hex: "#155eef", rgb: "21,94,239" }, { name: "Clear violet", hex: "#6e56cf", rgb: "110,86,207" }, { name: "Warm coral", hex: "#e05a47", rgb: "224,90,71" }];
+  return <div className="customize-screen"><div className="customize-heading"><div><p className="eyebrow">PERSONALIZE AHOY</p><h1>Make it<br /><em>yours.</em></h1><p className="hero-copy">Tune the atmosphere around the music you own.</p></div><button className="outline-button" type="button" onClick={onBack}>← Back to library</button></div><div className="customize-grid"><section className="settings-card"><div className="card-heading"><div><p className="eyebrow">APPEARANCE</p><h2>Surface & signal</h2></div><span className="ownership-badge">LOCAL ONLY</span></div><label className="setting-label">Accent color<span>{accent.name}</span></label><div className="swatches">{swatches.map((swatch) => <button key={swatch.name} className={`swatch${accent.hex === swatch.hex ? " is-selected" : ""}`} style={{ background: swatch.hex }} aria-label={swatch.name} type="button" onClick={() => setAccent(swatch)} />)}<label className="custom-color"><input aria-label="Custom accent color" type="color" value={accent.hex} onChange={(event) => setAccent({ name: "Custom color", hex: event.target.value, rgb: "10,132,255" })} /><span>＋</span></label></div><RangeSetting label="Glass opacity" value={glass} min={35} max={88} suffix="%" onChange={setGlass} /><RangeSetting label="Glass blur" value={blur} min={8} max={42} suffix="px" onChange={setBlur} /><label className="toggle-setting"><span><strong>Ambient glow</strong><small>Let the active color softly enter the room.</small></span><input aria-label="Ambient glow" type="checkbox" checked={ambientGlow} onChange={(event) => setAmbientGlow(event.target.checked)} /><i /></label></section><section className="customize-preview"><p className="eyebrow">LIVE PREVIEW</p><div className="preview-window"><div className="preview-window__top"><span /><span /><span /></div><div className="preview-window__body"><div className="preview-orb" style={{ background: `radial-gradient(circle at 35% 30%, ${accent.hex}, rgba(${accent.rgb},.22) 22%, rgba(255,255,255,.34) 70%)` }} /><div><span className="preview-kicker">NOW PLAYING</span><strong>Paper Sail</strong><small>Harbor Lights · Night Ferry</small></div><button className="preview-play" style={{ background: accent.hex }} type="button">Ⅱ</button></div></div><div className="preview-note"><span className="storage-dot" /><span><strong>Your library stays yours.</strong><small>These choices are saved on this device.</small></span></div></section></div></div>;
+}
+function RangeSetting({ label, value, min, max, suffix, onChange }: { label: string; value: number; min: number; max: number; suffix: string; onChange: (value: number) => void }) { return <label className="range-setting"><span><strong>{label}</strong><b>{value}{suffix}</b></span><input aria-label={label} type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>; }
+function titleCase(value: string) { return value.replace("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+function formatTime(milliseconds: number): string { const seconds = Math.floor(Math.max(0, milliseconds) / 1_000); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`; }
