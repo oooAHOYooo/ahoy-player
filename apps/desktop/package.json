@@ -10,7 +10,7 @@
     "icon": "ahoy-logo.png",
     "directories": { "output": "release" },
     "files": ["dist/**/*", "dist-electron/**/*", "package.json", "node_modules/**/*"],
-    "mac": { "category": "public.app-category.music", "target": ["dmg", "zip"] }
+    "mac": { "category": "public.app-category.music", "identity": "-", "target": ["dmg", "zip"] }
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
