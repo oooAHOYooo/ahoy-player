@@ -7,6 +7,7 @@
   "build": {
     "appId": "ooo.ahoy.player",
     "productName": "Ahoy Player",
+    "icon": "ahoy-logo.png",
     "directories": { "output": "release" },
     "files": ["dist/**/*", "dist-electron/**/*", "package.json", "node_modules/**/*"],
     "mac": { "category": "public.app-category.music", "target": ["dmg", "zip"] }
