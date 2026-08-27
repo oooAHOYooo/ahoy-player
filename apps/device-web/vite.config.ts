@@ -11,5 +11,13 @@ export default defineConfig({
       "@ahoy/player-ui-dial": path.resolve(__dirname, "../../packages/ui-dial/src"),
       "@ahoy/player-web-adapters": path.resolve(__dirname, "../../packages/web-adapters/src")
     }
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        landing: path.resolve(__dirname, "index.html"),
+        player: path.resolve(__dirname, "player.html")
+      }
+    }
   }
 });
