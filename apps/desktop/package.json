@@ -4,11 +4,20 @@
   "version": "0.1.0",
   "type": "module",
   "main": "dist-electron/main.js",
+  "build": {
+    "appId": "ooo.ahoy.player",
+    "productName": "Ahoy Player",
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "dist-electron/**/*", "package.json", "node_modules/**/*"],
+    "mac": { "category": "public.app-category.music", "target": ["dmg", "zip"] }
+  },
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:renderer": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build:electron": "tsc --project tsconfig.electron.json",
     "build": "vite build && npm run build:electron",
+    "package:mac": "npm run build && electron-builder --mac dmg zip",
+    "package:mac:x64": "npm run build && electron-builder --mac dmg zip --x64",
     "start": "electron .",
     "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.electron.json --noEmit"
   },
@@ -27,7 +36,7 @@
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "electron": "^33.4.11",
+    "electron": "33.4.11",
     "typescript": "^5.5.4",
     "vite": "^5.4.2"
   }
