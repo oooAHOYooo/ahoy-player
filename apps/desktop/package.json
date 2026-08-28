@@ -9,7 +9,8 @@
     "productName": "Ahoy Player",
     "icon": "ahoy-logo.png",
     "directories": { "output": "release" },
-    "files": ["dist/**/*", "dist-electron/**/*", "package.json", "node_modules/**/*"],
+    "files": ["dist/**/*", "dist-electron/**/*", "INSTALL.html", "ahoy-logo.png", "package.json", "node_modules/**/*"],
+    "dmg": { "contents": [{ "x": 180, "y": 250, "type": "file", "path": "INSTALL.html" }, { "x": 480, "y": 250, "type": "link", "path": "/Applications" }] },
     "mac": { "category": "public.app-category.music", "identity": "-", "target": ["dmg", "zip"] }
   },
   "scripts": {
