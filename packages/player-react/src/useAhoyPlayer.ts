@@ -82,6 +82,17 @@ export function useAhoyPlayer({
   const skipNextSave = useRef(false);
 
   useEffect(() => {
+    if (!playbackAdapter) return;
+    return playbackAdapter.subscribe((adapterPlayback) => {
+      setPlayback((current) => ({
+        ...adapterPlayback,
+        queue: current.queue,
+        queueIndex: current.queueIndex
+      }));
+    });
+  }, [playbackAdapter]);
+
+  useEffect(() => {
     if (!persistence) return;
     let active = true;
     void persistence.load().then((snapshot) => {

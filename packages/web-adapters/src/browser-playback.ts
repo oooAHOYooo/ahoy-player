@@ -47,8 +47,12 @@ export class BrowserAudioPlaybackAdapter implements PlaybackAdapter {
   }
 
   async play(): Promise<void> {
-    await this.audio.play();
-    this.update(reducePlayback(this.state, { type: "play" }));
+    try {
+      await this.audio.play();
+      this.update(reducePlayback(this.state, { type: "play" }));
+    } catch {
+      this.update(reducePlayback(this.state, { type: "set-error", message: "This file could not be played by this browser." }));
+    }
   }
 
   async pause(): Promise<void> {

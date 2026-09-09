@@ -93,6 +93,9 @@ body { background: linear-gradient(135deg, #f6f8f5 0%, #e8eee7 48%, #f5f6f1 100%
 .app-shell { width: 100%; max-width: none; margin: 0; padding-top: 0; padding-left: 0; }
 .app-shell > .sidebar { padding-left: 1.5rem; }
 
+.moods-screen { max-width: 66rem; padding: clamp(2rem, 6vw, 5.3rem) 0 2rem; } .moods-heading { display: flex; justify-content: space-between; gap: 2rem; align-items: start; } .moods-heading .hero-copy { max-width: 32rem; } .moods-screen .free-packs { margin-top: 3.2rem; }
+@media (max-width: 620px) { .moods-heading { flex-direction: column; gap: 1.5rem; } .moods-screen { padding-top: 2rem; } }
+
 /* Live keyboard synth */
 .synth-keyboard { position: fixed; z-index: 6; right: 1.5rem; bottom: 6.6rem; left: 1.5rem; max-width: 64rem; margin: auto; padding: .8rem 1rem .7rem; border: 1px solid rgba(90,118,88,.3); border-radius: .8rem; background: rgba(17,27,23,.91); box-shadow: 0 1.1rem 3rem rgba(12,22,14,.25), inset 0 1px rgba(255,255,255,.08); color: #edf7ea; backdrop-filter: blur(22px) saturate(135%); transition: box-shadow .28s ease; }
 .synth-keyboard:not(.is-active) .synth-controls, .synth-keyboard:not(.is-active) .synth-keyboard__keys, .synth-keyboard:not(.is-active) .synth-keyboard__hint { display: none; }
