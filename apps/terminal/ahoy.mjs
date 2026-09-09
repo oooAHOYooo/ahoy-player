@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { homedir, platform } from "node:os";
+import { homedir, platform, tmpdir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
@@ -12,6 +12,9 @@ const useColor = Boolean(process.stdout.isTTY && !process.env.NO_COLOR);
 const tint = (code, value) => useColor ? `\x1b[${code}m${value}\x1b[0m` : value;
 const accent = (value) => tint("38;5;156", value);
 const dim = (value) => tint("2", value);
+const remixKeys = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d", "f", "g", "h"];
+const remixFrequencies = [261.63, 293.66, 329.63, 349.23, 392, 440, 493.88, 523.25, 587.33, 659.25, 130.81, 146.83, 164.81, 174.61, 196, 220];
+const remixTonePaths = new Map();
 
 export function labelsForPath(filePath) {
   const stem = basename(filePath, extname(filePath)).replace(/[_]+/g, " ").trim();
@@ -109,12 +112,44 @@ export async function playTrack(track) {
   return spawn(player.command, [...player.baseArgs, track.path], { stdio: "inherit" });
 }
 
+export function buildToneWav(frequency) {
+  const sampleRate = 22_050;
+  const samples = Math.floor(sampleRate * 0.42);
+  const wav = Buffer.alloc(44 + samples * 2);
+  wav.write("RIFF", 0); wav.writeUInt32LE(36 + samples * 2, 4); wav.write("WAVEfmt ", 8);
+  wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(sampleRate, 24); wav.writeUInt32LE(sampleRate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+  wav.write("data", 36); wav.writeUInt32LE(samples * 2, 40);
+  for (let index = 0; index < samples; index += 1) {
+    const seconds = index / sampleRate;
+    const envelope = Math.min(1, index / 220) * Math.max(0, 1 - seconds / 0.42);
+    const phase = (seconds * frequency) % 1;
+    const triangle = 1 - 4 * Math.abs(Math.round(phase) - phase);
+    wav.writeInt16LE(Math.round(triangle * envelope * 0.22 * 32_767), 44 + index * 2);
+  }
+  return wav;
+}
+
+async function playRemixNote(index) {
+  const player = playerCommand();
+  if (!player) return;
+  const frequency = remixFrequencies[index];
+  let tonePath = remixTonePaths.get(frequency);
+  if (!tonePath) {
+    tonePath = join(tmpdir(), `ahoy-remix-${Math.round(frequency)}.wav`);
+    await writeFile(tonePath, buildToneWav(frequency));
+    remixTonePaths.set(frequency, tonePath);
+  }
+  spawn(player.command, [...player.baseArgs, tonePath], { stdio: "ignore" });
+}
+
 function clearScreen() { process.stdout.write("\x1b[2J\x1b[H"); }
 function crop(value, width) { return value.length > width ? `${value.slice(0, Math.max(1, width - 1))}…` : value; }
-function waveform(tick, active) {
+function waveform(tick, active, width) {
   const levels = [2, 5, 3, 7, 4, 8, 3, 6, 2, 7, 5, 8, 4, 6, 3, 7, 5, 2, 8, 4, 6, 3, 7, 5, 2, 8, 4, 6, 3, 7, 5, 2];
   const glyphs = "▁▂▃▄▅▆▇█";
-  return levels.map((level, index) => {
+  return Array.from({ length: width }, (_, index) => {
+    const level = levels[index % levels.length];
     const bounce = active ? ((tick + index * 3) % 5 === 0 ? 1 : 0) : 0;
     return glyphs[Math.min(7, level - 1 + bounce)];
   }).join("");
@@ -130,37 +165,53 @@ async function tui() {
   let currentTrack = null;
   let tick = 0;
   let closed = false;
+  let paused = false;
+  let remixMode = false;
   const render = () => {
     if (closed) return;
     clearScreen();
-    const active = Boolean(child && !child.killed);
+    const active = Boolean(child && !child.killed && !paused);
     const track = currentTrack ?? tracks[selected];
-    console.log(`${accent("AHOY")}${dim(" / terminal player")}  ${dim("↑↓ browse · enter play · space stop · q quit")}`);
-    console.log(dim("─".repeat(68)));
-    console.log(`${accent(active ? "▶ NOW PLAYING" : "○ READY")} ${dim("· one music track at a time")}`);
-    console.log(`${crop(track.title, 42)} ${dim(`— ${crop(track.artist, 18)}`)}`);
-    console.log(`${accent(waveform(tick, active))}  ${dim(active ? "playing locally" : "select a song to play")}`);
-    console.log(dim("─".repeat(68)));
-    const start = Math.max(0, Math.min(selected - 4, tracks.length - 9));
-    tracks.slice(start, start + 9).forEach((track, offset) => {
+    const width = Math.max(54, Math.min(104, (process.stdout.columns || 86) - 8));
+    console.log(`${accent("AHOY / LIVE DECK")}${dim("  ↑↓ select · enter play · space pause · m remix · x quit")}`);
+    console.log(dim("═".repeat(width)));
+    console.log(`${accent(active ? "▶  NOW PLAYING" : paused ? "Ⅱ  PAUSED" : "○  READY")}  ${dim("ONE MUSIC TRACK · LOCAL OUTPUT")}`);
+    console.log(`${accent(crop(track.title.toUpperCase(), width - 2))}`);
+    console.log(dim(`${crop(track.artist, Math.floor(width / 2))}  ·  ${crop(track.album, Math.floor(width / 2) - 5)}`));
+    console.log(`\n${accent(waveform(tick, active, width))}`);
+    console.log(`${dim("▔".repeat(width))}  ${dim(active ? "PLAYING" : paused ? "PAUSED — SPACE TO RESUME" : "ENTER TO PLAY")}`);
+    console.log(`${remixMode ? accent("REMIX MODE  Q W E R T Y U I O P  /  A S D F G H") : dim("Press M for QWERTY piano remix notes over this track")}`);
+    console.log(dim("─".repeat(width)));
+    const start = Math.max(0, Math.min(selected - 2, tracks.length - 5));
+    tracks.slice(start, start + 5).forEach((track, offset) => {
       const index = start + offset;
       const marker = index === selected ? accent("›") : " ";
       const playing = active && currentTrack?.id === track.id ? accent("▶") : " ";
-      console.log(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${crop(track.title, 43)} ${dim(`— ${crop(track.artist, 17)}`)}`);
+      console.log(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${crop(track.title, Math.max(25, width - 29))} ${dim(`— ${crop(track.artist, 20)}`)}`);
     });
     console.log(`\n${dim(`${tracks.length} local tracks · ${libraryPath}`)}`);
   };
-  const stop = () => { if (child && !child.killed) child.kill(); child = null; currentTrack = null; };
+  const stop = () => {
+    if (child && !child.killed) { if (paused) child.kill("SIGCONT"); child.kill(); }
+    child = null; currentTrack = null; paused = false; remixMode = false;
+  };
+  const pauseOrResume = () => {
+    if (!child || child.killed) return;
+    child.kill(paused ? "SIGCONT" : "SIGSTOP");
+    paused = !paused;
+  };
   render();
   const animation = setInterval(() => { tick += 1; render(); }, 180);
   process.stdin.setRawMode(true); process.stdin.resume();
   await new Promise((done) => process.stdin.on("data", async (key) => {
     const value = key.toString();
-    if (value === "q" || value === "\u0003") { closed = true; clearInterval(animation); stop(); process.stdin.setRawMode(false); process.stdin.pause(); clearScreen(); done(); return; }
+    if ((value === "x" || value === "\u0003" || (value === "q" && !remixMode))) { closed = true; clearInterval(animation); stop(); process.stdin.setRawMode(false); process.stdin.pause(); clearScreen(); done(); return; }
     if (value === "\u001b[A" || value === "k") selected = Math.max(0, selected - 1);
     if (value === "\u001b[B" || value === "j") selected = Math.min(tracks.length - 1, selected + 1);
-    if (value === " ") stop();
-    if (value === "\r") { stop(); currentTrack = tracks[selected]; try { child = await playTrack(currentTrack); child.on("exit", () => { child = null; currentTrack = null; render(); }); } catch (error) { currentTrack = null; console.error(error.message); } }
+    if (value === " ") pauseOrResume();
+    if (value === "m" && currentTrack && !paused) remixMode = !remixMode;
+    if (remixMode) { const note = remixKeys.indexOf(value.toLowerCase()); if (note >= 0) void playRemixNote(note); }
+    if (value === "\r") { stop(); currentTrack = tracks[selected]; try { child = await playTrack(currentTrack); child.on("exit", () => { child = null; currentTrack = null; paused = false; remixMode = false; render(); }); } catch (error) { currentTrack = null; console.error(error.message); } }
     render();
   }));
 }
