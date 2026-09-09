@@ -4,14 +4,17 @@ import { BrowserAudioPlaybackAdapter } from "./browser-playback";
 import { LocalStoragePersistenceAdapter } from "./local-storage";
 
 class FakeAudio {
+  static latest: FakeAudio | undefined;
   currentTime = 0;
   duration = Number.NaN;
   preload = "";
   src = "";
   volume = 1;
+  pauseCount = 0;
+  constructor() { FakeAudio.latest = this; }
   addEventListener() {}
   load() {}
-  pause() {}
+  pause() { this.pauseCount += 1; }
   async play() {}
 }
 
@@ -28,6 +31,17 @@ describe("browser playback", () => {
     await adapter.setVolume(1.5);
 
     expect(adapter.getState().volume).toBe(1);
+  });
+
+  it("stops the current audio element before selecting another track", async () => {
+    (globalThis as { Audio: unknown }).Audio = FakeAudio;
+    const adapter = new BrowserAudioPlaybackAdapter();
+
+    await adapter.play();
+    await adapter.load({ source: { kind: "purchase", locator: "not-yet-available" } } as never);
+
+    expect(FakeAudio.latest?.pauseCount).toBe(1);
+    expect(adapter.getState().status).toBe("error");
   });
 });
 

@@ -28,6 +28,10 @@ export class BrowserAudioPlaybackAdapter implements PlaybackAdapter {
   }
 
   async load(track: TrackRecord): Promise<void> {
+    // A host owns one HTMLAudioElement: selecting another track always stops the
+    // current source before any new file lookup or playback request begins.
+    this.audio.pause();
+    this.audio.currentTime = 0;
     if (track.source.kind !== "local-file") {
       this.update(reducePlayback(this.state, { type: "set-error", message: "This purchase is not available in the web player yet." }));
       return;
