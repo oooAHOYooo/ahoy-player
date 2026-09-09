@@ -21,8 +21,9 @@ export function mountTerminalQuickstart() {
   let cardAttempts = 12;
   const addLibraryCard = () => {
     const hero = document.querySelector(".hero-row");
+    const content = document.querySelector(".content");
     if (document.querySelector(".ahoy-terminal-card")) return;
-    if (!hero) {
+    if (!hero && !content) {
       if (cardAttempts-- > 0) requestAnimationFrame(addLibraryCard);
       return;
     }
@@ -35,7 +36,8 @@ export function mountTerminalQuickstart() {
 ▂▅▃▇▄█▃▆▂▇▅█▄▆▃▇
 one track at a time</pre>
       <div class="ahoy-terminal-card__command"><code>${terminalCommand}</code><button type="button" data-terminal-copy>Copy for Terminal</button></div>`;
-    hero.insertAdjacentElement("afterend", card);
+    if (hero) hero.insertAdjacentElement("afterend", card);
+    else content?.prepend(card);
     card.querySelector<HTMLButtonElement>("[data-terminal-copy]")!.addEventListener("click", () => copyCommand(card.querySelector<HTMLButtonElement>("[data-terminal-copy]")!));
   };
   requestAnimationFrame(addLibraryCard);
