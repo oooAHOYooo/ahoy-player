@@ -28,7 +28,7 @@ describe("Ahoy Dial navigation", () => {
     const backed = reduceNavigation(entered, { type: "back" }, 1);
     expect(wrapped.focusIndex).toBe(4);
     expect(entered.screen).toBe("now-playing");
-    expect(backed.screen).toBe("home");
+    expect(backed.screen).toBe("library");
   });
 });
 

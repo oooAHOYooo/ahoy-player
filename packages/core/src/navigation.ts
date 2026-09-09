@@ -9,7 +9,7 @@ export const playerScreens: Exclude<PlayerScreen, "home">[] = [
 ];
 
 export function createNavigationState(): NavigationState {
-  return { screen: "home", focusIndex: 0, history: [] };
+  return { screen: "library", focusIndex: 0, history: [] };
 }
 
 export function reduceNavigation(

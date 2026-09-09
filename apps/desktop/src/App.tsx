@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, type CSSProperties } from "react";
 import {
-  demoLibrary,
+  createEmptyLibrary,
   playerScreens,
   type DialAction,
   type TrackRecord
@@ -17,7 +17,7 @@ const libraryScreens = playerScreens.filter((screen) => screen !== "now-playing"
 
 export function App() {
   const isDeckWindow = new URLSearchParams(window.location.search).get("view") === "deck";
-  const model = useAhoyPlayer({ initialLibrary: demoLibrary, fileImport, persistence, playbackAdapter });
+  const model = useAhoyPlayer({ initialLibrary: createEmptyLibrary(), fileImport, persistence, playbackAdapter });
 
   const dispatchInput = useCallback((action: DialAction) => {
     if (!isDeckWindow) {

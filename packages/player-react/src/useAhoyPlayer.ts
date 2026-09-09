@@ -87,10 +87,14 @@ export function useAhoyPlayer({
     void persistence.load().then((snapshot) => {
       if (!active) return;
       if (snapshot) {
-        setLibrary(snapshot.library);
-        const restoredPlayback = reducePlayback(snapshot.playback, {
+        const restoredLibrary = isLegacyDemoLibrary(snapshot.library) ? createEmptyLibrary() : snapshot.library;
+        setLibrary(restoredLibrary);
+        const playbackSnapshot = isLegacyDemoLibrary(snapshot.library)
+          ? createInitialPlaybackState()
+          : snapshot.playback;
+        const restoredPlayback = reducePlayback(playbackSnapshot, {
           type: "set-volume",
-          volume: snapshot.playback.volume
+          volume: playbackSnapshot.volume
         });
         setPlayback(restoredPlayback);
         if (playbackAdapter) void playbackAdapter.setVolume(restoredPlayback.volume);
@@ -278,6 +282,10 @@ export function useAhoyPlayer({
     nextTrack,
     previousTrack
   };
+}
+
+function isLegacyDemoLibrary(library: LibraryRecord): boolean {
+  return library.tracks.length > 0 && library.tracks.every((track) => track.id.startsWith("local:demo-"));
 }
 
 function getItemsForScreen(

@@ -4,6 +4,7 @@ dist-electron/
 .DS_Store
 *.log
 .vite/
+.local/release-guardian/
 
 # Electron Builder output is local release material, not source.
 apps/desktop/release/

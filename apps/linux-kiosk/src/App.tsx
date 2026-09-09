@@ -1,4 +1,4 @@
-import { demoLibrary } from "@ahoy/player-core";
+import { createEmptyLibrary } from "@ahoy/player-core";
 import { PlayerList, screenLabels, useAhoyPlayer } from "@ahoy/player-react";
 import { AhoyDial, useAhoyInput } from "@ahoy/player-ui-dial";
 import { LocalStoragePersistenceAdapter, SimulatedPlaybackAdapter } from "@ahoy/player-web-adapters";
@@ -9,7 +9,7 @@ const persistence = new LocalStoragePersistenceAdapter("ahoy-player:kiosk:v1");
 const playbackAdapter = new SimulatedPlaybackAdapter();
 
 export function App() {
-  const model = useAhoyPlayer({ initialLibrary: demoLibrary, fileImport, persistence, playbackAdapter });
+  const model = useAhoyPlayer({ initialLibrary: createEmptyLibrary(), fileImport, persistence, playbackAdapter });
   useAhoyInput(model.dispatchDial, { keyboardSource: "remote", gamepad: true });
   const track = model.nowPlaying;
 

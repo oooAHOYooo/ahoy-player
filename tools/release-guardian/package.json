@@ -1,0 +1,9 @@
+{
+  "name": "ahoy-player-release-guardian",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "run": "node release-guardian.mjs",
+    "dry-run": "node release-guardian.mjs --dry-run"
+  }
+}
