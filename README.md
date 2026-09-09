@@ -52,6 +52,7 @@ The Chromium command is an example launcher, not a complete appliance image. Aut
 The terminal host is a small, local-first companion inspired by classic terminal music players: scan a folder, browse it in the terminal, then play a selection without starting Electron.
 
 ```bash
+cd ~/ahoyMp3
 npm run ahoy -- scan ~/Music
 npm run ahoy -- library
 npm run ahoy -- search "ambient"

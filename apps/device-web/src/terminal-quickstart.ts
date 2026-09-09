@@ -1,4 +1,4 @@
-const terminalCommand = "npm run ahoy -- scan ~/Music && npm run ahoy -- tui";
+const terminalCommand = "cd ~/ahoyMp3 && npm run ahoy -- scan ~/Music && npm run ahoy -- tui";
 
 export function mountTerminalQuickstart() {
   const host = document.createElement("aside");
