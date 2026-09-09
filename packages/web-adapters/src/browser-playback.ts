@@ -16,6 +16,7 @@ export class BrowserAudioPlaybackAdapter implements PlaybackAdapter {
 
   constructor() {
     this.audio.preload = "metadata";
+    this.audio.volume = this.state.volume;
     this.audio.addEventListener("timeupdate", () => {
       this.update(reducePlayback(this.state, { type: "seek", positionMs: Math.round(this.audio.currentTime * 1_000) }));
     });

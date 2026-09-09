@@ -48,6 +48,7 @@ export type AhoyPlayerModel = {
   playTrack: (trackId: string) => void;
   togglePlayback: () => void;
   seek: (positionMs: number) => void;
+  setVolume: (volume: number) => void;
   nextTrack: () => void;
   previousTrack: () => void;
 };
@@ -87,21 +88,31 @@ export function useAhoyPlayer({
       if (!active) return;
       if (snapshot) {
         setLibrary(snapshot.library);
-        setPlayback(snapshot.playback);
+        const restoredPlayback = reducePlayback(snapshot.playback, {
+          type: "set-volume",
+          volume: snapshot.playback.volume
+        });
+        setPlayback(restoredPlayback);
+        if (playbackAdapter) void playbackAdapter.setVolume(restoredPlayback.volume);
       }
       setIsHydrated(true);
     });
     return () => { active = false; };
-  }, [persistence]);
+  }, [persistence, playbackAdapter]);
 
   useEffect(() => {
     if (!persistence?.subscribe) return;
     return persistence.subscribe((snapshot) => {
       skipNextSave.current = true;
       setLibrary(snapshot.library);
-      setPlayback(snapshot.playback);
+      const restoredPlayback = reducePlayback(snapshot.playback, {
+        type: "set-volume",
+        volume: snapshot.playback.volume
+      });
+      setPlayback(restoredPlayback);
+      if (playbackAdapter) void playbackAdapter.setVolume(restoredPlayback.volume);
     });
-  }, [persistence]);
+  }, [persistence, playbackAdapter]);
 
   useEffect(() => {
     if (!persistence || !isHydrated) return;
@@ -142,6 +153,14 @@ export function useAhoyPlayer({
     setPlayback((current) => {
       const next = reducePlayback(current, { type: "seek", positionMs });
       if (playbackAdapter) void playbackAdapter.seek(next.positionMs);
+      return next;
+    });
+  }, [playbackAdapter]);
+
+  const setVolume = useCallback((volume: number) => {
+    setPlayback((current) => {
+      const next = reducePlayback(current, { type: "set-volume", volume });
+      if (playbackAdapter) void playbackAdapter.setVolume(next.volume);
       return next;
     });
   }, [playbackAdapter]);
@@ -255,6 +274,7 @@ export function useAhoyPlayer({
     playTrack,
     togglePlayback,
     seek,
+    setVolume,
     nextTrack,
     previousTrack
   };

@@ -42,4 +42,11 @@ describe("shared queue behavior", () => {
     expect(next.currentTrackId).toBe("b");
     expect(clamped.currentTrackId).toBe("b");
   });
+
+  it("clamps volume to the browser-safe range", () => {
+    const initial = createInitialPlaybackState();
+    expect(reducePlayback(initial, { type: "set-volume", volume: -1 }).volume).toBe(0);
+    expect(reducePlayback(initial, { type: "set-volume", volume: 2 }).volume).toBe(1);
+    expect(reducePlayback(initial, { type: "set-volume", volume: 0.35 }).volume).toBe(0.35);
+  });
 });

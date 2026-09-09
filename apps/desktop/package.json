@@ -2,16 +2,24 @@
   "name": "@ahoy/player-desktop",
   "private": true,
   "version": "0.1.0",
+  "description": "Local-first Ahoy music player for Linux, macOS, and Windows.",
+  "author": "Ahoy",
   "type": "module",
   "main": "dist-electron/main.js",
   "build": {
     "appId": "ooo.ahoy.player",
     "productName": "Ahoy Player",
+    "executableName": "ahoy-player",
     "icon": "ahoy-logo.png",
     "directories": { "output": "release" },
     "files": ["dist/**/*", "dist-electron/**/*", "INSTALL.html", "ahoy-logo.png", "package.json", "node_modules/**/*"],
     "dmg": { "contents": [{ "x": 180, "y": 250, "type": "file", "path": "INSTALL.html" }, { "x": 480, "y": 250, "type": "link", "path": "/Applications" }] },
-    "mac": { "category": "public.app-category.music", "identity": "-", "target": ["dmg", "zip"] }
+    "mac": { "category": "public.app-category.music", "identity": "-", "target": ["dmg", "zip"] },
+    "linux": {
+      "category": "AudioVideo",
+      "target": ["AppImage", "dir"],
+      "artifactName": "Ahoy-Player-${version}-${arch}.${ext}"
+    }
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
@@ -20,6 +28,7 @@
     "build": "vite build && npm run build:electron",
     "package:mac": "npm run build && electron-builder --mac dmg zip",
     "package:mac:x64": "npm run build && electron-builder --mac dmg zip --x64",
+    "package:linux": "npm run build && electron-builder --linux AppImage dir",
     "start": "electron .",
     "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.electron.json --noEmit"
   },

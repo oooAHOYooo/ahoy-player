@@ -54,6 +54,7 @@ apps/
   desktop/          Electron main/preload + React desktop renderer
   device-web/       installable touch/web PWA
   linux-kiosk/      big-screen React shell for a Linux media box
+  terminal/         planned keyboard-first CLI/TUI host using shared behavior
   xbox-shell/       boundary document only; no pretend desktop-compatible package
 packages/
   core/             canonical schema, reducers, actions, and adapter contracts
@@ -66,6 +67,7 @@ docs/
   ecosystem-architecture.md
   mvp-web-checklist.md
   megaprompts.md     historical design input, not build instructions
+  AHOY_MANIFESTO.md  living product compass and host strategy
 ```
 
 ## Milestone behavior
