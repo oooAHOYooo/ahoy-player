@@ -110,6 +110,15 @@ export async function playTrack(track) {
 }
 
 function clearScreen() { process.stdout.write("\x1b[2J\x1b[H"); }
+function crop(value, width) { return value.length > width ? `${value.slice(0, Math.max(1, width - 1))}…` : value; }
+function waveform(tick, active) {
+  const levels = [2, 5, 3, 7, 4, 8, 3, 6, 2, 7, 5, 8, 4, 6, 3, 7, 5, 2, 8, 4, 6, 3, 7, 5, 2, 8, 4, 6, 3, 7, 5, 2];
+  const glyphs = "▁▂▃▄▅▆▇█";
+  return levels.map((level, index) => {
+    const bounce = active ? ((tick + index * 3) % 5 === 0 ? 1 : 0) : 0;
+    return glyphs[Math.min(7, level - 1 + bounce)];
+  }).join("");
+}
 
 async function tui() {
   const library = await loadLibrary();
@@ -118,28 +127,40 @@ async function tui() {
   if (!tracks.length) { console.log("No tracks yet. Run: ahoy scan ~/Music"); return; }
   let selected = 0;
   let child = null;
+  let currentTrack = null;
+  let tick = 0;
+  let closed = false;
   const render = () => {
+    if (closed) return;
     clearScreen();
-    console.log(`${accent("AHOY")}${dim(" / terminal deck")}  ${dim("↑↓ browse · enter play · space stop · q quit")}`);
+    const active = Boolean(child && !child.killed);
+    const track = currentTrack ?? tracks[selected];
+    console.log(`${accent("AHOY")}${dim(" / terminal player")}  ${dim("↑↓ browse · enter play · space stop · q quit")}`);
     console.log(dim("─".repeat(68)));
-    const start = Math.max(0, Math.min(selected - 7, tracks.length - 15));
-    tracks.slice(start, start + 15).forEach((track, offset) => {
+    console.log(`${accent(active ? "▶ NOW PLAYING" : "○ READY")} ${dim("· one music track at a time")}`);
+    console.log(`${crop(track.title, 42)} ${dim(`— ${crop(track.artist, 18)}`)}`);
+    console.log(`${accent(waveform(tick, active))}  ${dim(active ? "playing locally" : "select a song to play")}`);
+    console.log(dim("─".repeat(68)));
+    const start = Math.max(0, Math.min(selected - 4, tracks.length - 9));
+    tracks.slice(start, start + 9).forEach((track, offset) => {
       const index = start + offset;
       const marker = index === selected ? accent("›") : " ";
-      console.log(`${marker} ${String(index + 1).padStart(3, " ")}  ${track.title} ${dim(`— ${track.artist}`)}`);
+      const playing = active && currentTrack?.id === track.id ? accent("▶") : " ";
+      console.log(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${crop(track.title, 43)} ${dim(`— ${crop(track.artist, 17)}`)}`);
     });
     console.log(`\n${dim(`${tracks.length} local tracks · ${libraryPath}`)}`);
   };
-  const stop = () => { if (child && !child.killed) child.kill(); child = null; };
+  const stop = () => { if (child && !child.killed) child.kill(); child = null; currentTrack = null; };
   render();
+  const animation = setInterval(() => { tick += 1; render(); }, 180);
   process.stdin.setRawMode(true); process.stdin.resume();
   await new Promise((done) => process.stdin.on("data", async (key) => {
     const value = key.toString();
-    if (value === "q" || value === "\u0003") { stop(); process.stdin.setRawMode(false); process.stdin.pause(); clearScreen(); done(); return; }
+    if (value === "q" || value === "\u0003") { closed = true; clearInterval(animation); stop(); process.stdin.setRawMode(false); process.stdin.pause(); clearScreen(); done(); return; }
     if (value === "\u001b[A" || value === "k") selected = Math.max(0, selected - 1);
     if (value === "\u001b[B" || value === "j") selected = Math.min(tracks.length - 1, selected + 1);
     if (value === " ") stop();
-    if (value === "\r") { stop(); try { child = await playTrack(tracks[selected]); child.on("exit", () => { child = null; render(); }); } catch (error) { console.error(error.message); } }
+    if (value === "\r") { stop(); currentTrack = tracks[selected]; try { child = await playTrack(currentTrack); child.on("exit", () => { child = null; currentTrack = null; render(); }); } catch (error) { currentTrack = null; console.error(error.message); } }
     render();
   }));
 }
