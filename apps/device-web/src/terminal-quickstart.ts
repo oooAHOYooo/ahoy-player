@@ -11,7 +11,7 @@ export function mountTerminalQuickstart() {
       <button class="ahoy-terminal-quickstart__close" type="button" aria-label="Close terminal instructions">×</button>
       <p>AHOYCLI</p>
       <h2>Your music, in a terminal.</h2>
-      <span>Scan your Music folder, then browse and play locally. Works in macOS Terminal with no extra audio package.</span>
+      <span>Scan your Music folder, then browse a waveform deck and play one local track at a time. Works in macOS Terminal with no extra audio package.</span>
       <code>${terminalCommand}</code>
       <button class="ahoy-terminal-quickstart__copy" type="button">Copy command</button>
       <small>Linux: install <b>mpv</b>, VLC, or FFmpeg first.</small>
@@ -30,7 +30,10 @@ export function mountTerminalQuickstart() {
     card.className = "ahoy-terminal-card";
     card.setAttribute("aria-label", "AHOYCLI terminal player");
     card.innerHTML = `
-      <div><p>AHOYCLI / LOCAL TERMINAL PLAYER</p><h2>Take your library to the terminal.</h2><span>Scan your own MP3 folder, then browse and play it with a keyboard-first local player.</span></div>
+      <div><p>AHOYCLI / LOCAL TERMINAL PLAYER</p><h2>Take your library to the terminal.</h2><span>Browse a waveform deck, play one local track at a time, and keep the controls under your hands.</span><div class="ahoy-terminal-card__features"><span>WAVEFORM DECK</span><span>ONE TRACK</span><span>↑↓ + ENTER</span></div></div>
+      <pre class="ahoy-terminal-card__preview" aria-label="Terminal player preview">▶ NOW PLAYING
+▂▅▃▇▄█▃▆▂▇▅█▄▆▃▇
+one track at a time</pre>
       <div class="ahoy-terminal-card__command"><code>${terminalCommand}</code><button type="button" data-terminal-copy>Copy for Terminal</button></div>`;
     hero.insertAdjacentElement("afterend", card);
     card.querySelector<HTMLButtonElement>("[data-terminal-copy]")!.addEventListener("click", () => copyCommand(card.querySelector<HTMLButtonElement>("[data-terminal-copy]")!));
