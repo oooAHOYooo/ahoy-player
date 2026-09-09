@@ -18,6 +18,25 @@ export function mountTerminalQuickstart() {
     </section>`;
   document.body.append(host);
 
+  let cardAttempts = 12;
+  const addLibraryCard = () => {
+    const hero = document.querySelector(".hero-row");
+    if (document.querySelector(".ahoy-terminal-card")) return;
+    if (!hero) {
+      if (cardAttempts-- > 0) requestAnimationFrame(addLibraryCard);
+      return;
+    }
+    const card = document.createElement("section");
+    card.className = "ahoy-terminal-card";
+    card.setAttribute("aria-label", "AHOYCLI terminal player");
+    card.innerHTML = `
+      <div><p>AHOYCLI / LOCAL TERMINAL PLAYER</p><h2>Take your library to the terminal.</h2><span>Scan your own MP3 folder, then browse and play it with a keyboard-first local player.</span></div>
+      <div class="ahoy-terminal-card__command"><code>${terminalCommand}</code><button type="button" data-terminal-copy>Copy for Terminal</button></div>`;
+    hero.insertAdjacentElement("afterend", card);
+    card.querySelector<HTMLButtonElement>("[data-terminal-copy]")!.addEventListener("click", () => copyCommand(card.querySelector<HTMLButtonElement>("[data-terminal-copy]")!));
+  };
+  requestAnimationFrame(addLibraryCard);
+
   const trigger = host.querySelector<HTMLButtonElement>(".ahoy-terminal-quickstart__trigger")!;
   const panel = host.querySelector<HTMLElement>(".ahoy-terminal-quickstart__panel")!;
   const close = host.querySelector<HTMLButtonElement>(".ahoy-terminal-quickstart__close")!;
@@ -25,13 +44,16 @@ export function mountTerminalQuickstart() {
   const setOpen = (open: boolean) => { panel.hidden = !open; trigger.setAttribute("aria-expanded", String(open)); };
   trigger.addEventListener("click", () => setOpen(panel.hidden));
   close.addEventListener("click", () => setOpen(false));
-  copy.addEventListener("click", async () => {
+  copy.addEventListener("click", () => copyCommand(copy));
+}
+
+async function copyCommand(button: HTMLButtonElement) {
     try {
       await navigator.clipboard.writeText(terminalCommand);
-      copy.textContent = "Copied";
-      window.setTimeout(() => { copy.textContent = "Copy command"; }, 1400);
+      const initialText = button.textContent;
+      button.textContent = "Copied";
+      window.setTimeout(() => { button.textContent = initialText; }, 1400);
     } catch {
-      copy.textContent = "Copy: command shown above";
+      button.textContent = "Copy: command shown above";
     }
-  });
 }
