@@ -47,6 +47,21 @@ chromium --kiosk http://127.0.0.1:4174
 
 The Chromium command is an example launcher, not a complete appliance image. Autostart, remote administration, display rotation, and hardware audio selection belong to the Linux image/service configuration.
 
+## Terminal player (macOS and Linux)
+
+The terminal host is a small, local-first companion inspired by classic terminal music players: scan a folder, browse it in the terminal, then play a selection without starting Electron.
+
+```bash
+npm run ahoy -- scan ~/Music
+npm run ahoy -- library
+npm run ahoy -- search "ambient"
+npm run ahoy -- tui
+```
+
+`tui` supports arrow keys (or `j`/`k`), Enter to play, Space to stop, and `q` to quit. Its metadata index is stored only in `~/.ahoy-player/library.json`; it never uploads your audio.
+
+On macOS, playback uses the built-in `afplay`, so it works in Terminal with no additional player package. On Linux it uses the first available of `mpv`, `cvlc` (VLC), or `ffplay`; install one of those with your distribution's package manager. The CLI currently reads labels from filenames/folders and plays local MP3 paths—the native tag-reader and richer queue are the next iteration.
+
 ## Repository map
 
 ```text

@@ -1,0 +1,14 @@
+{
+  "name": "@ahoy/player-terminal",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "ahoy": "./ahoy.mjs"
+  },
+  "scripts": {
+    "start": "node ./ahoy.mjs",
+    "typecheck": "node --check ./ahoy.mjs",
+    "test": "node --test ./test/ahoy.node-test.mjs"
+  }
+}

@@ -11,6 +11,8 @@
     "dev:desktop": "npm run dev --workspace @ahoy/player-desktop",
     "dev:web": "npm run dev --workspace @ahoy/player-web",
     "dev:kiosk": "npm run dev --workspace @ahoy/player-linux-kiosk",
+    "ahoy": "npm run start --workspace @ahoy/player-terminal --",
+    "dev:terminal": "npm run start --workspace @ahoy/player-terminal -- tui",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run"
