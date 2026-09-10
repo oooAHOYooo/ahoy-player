@@ -1,7 +1,7 @@
 {
   "name": "ahoy-player",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first Ahoy Player monorepo with desktop, touch, TV, and future console shells.",
   "workspaces": [
     "apps/*",

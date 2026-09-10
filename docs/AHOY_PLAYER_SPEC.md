@@ -14,8 +14,8 @@ Ahoy Player is a local-first music library and MP3 player. It combines a calm, g
 
 - `/` redirects to the download/documentation landing page.
 - `/download.html` is the public download hub.
-- It includes the Ahoy logo, product positioning, Mac downloads, browser preview, GitHub source, releases, and contact link.
-- Apple Silicon and Intel buttons link directly to the current GitHub Release assets.
+- It includes the Ahoy logo, product positioning, macOS and Linux downloads, browser preview, GitHub source, releases, and contact link.
+- Apple Silicon, Intel, and Linux AppImage buttons link directly to the current GitHub Release assets. Each release shows its build number.
 
 ### Browser player
 
@@ -49,6 +49,17 @@ npm run package:mac:x64 --workspace @ahoy/player-desktop
 ```
 
 - Current builds use ad-hoc signing for private testing. Public distribution should eventually use an Apple Developer signing identity and notarization.
+
+### Linux desktop app
+
+- The same Electron host in `apps/desktop` is packaged as a 64-bit AppImage.
+- Package it with:
+
+```bash
+npm run package:linux --workspace @ahoy/player-desktop
+```
+
+- The Linux artifact name includes both the release version and build number, for example `Ahoy-Player-0.1.1-build.1-x86_64.AppImage`.
 
 ## Visual system
 
@@ -89,7 +100,7 @@ Render deploys the web surface as a static site from `main`.
 - Static site root: download hub
 - Optional browser player: `/player.html`
 
-GitHub Releases stores the macOS DMG and ZIP artifacts. The current test release is `v0.1.0`.
+GitHub Releases stores the macOS DMG/ZIP and Linux AppImage artifacts. Linux is released as `v0.1.1`, build `1`; existing macOS installers remain available from `v0.1.0` until the next macOS build is produced.
 
 ## Known limitations
 
@@ -108,6 +119,6 @@ Before a release:
 3. Run `npm run build`.
 4. Verify `/`, `/download.html`, and `/player.html` in the Render preview.
 5. Test light and dark player states.
-6. Build Intel and Apple Silicon macOS packages.
+6. Build Intel and Apple Silicon macOS packages, then the Linux AppImage.
 7. Open a fresh DMG and test import, playback, and the separate deck.
-8. Update the GitHub Release assets and confirm the download links.
+8. Update the GitHub Release assets and confirm the macOS and Linux download links.
