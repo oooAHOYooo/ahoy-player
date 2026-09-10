@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir, platform, tmpdir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
 const appHome = process.env.AHOY_PLAYER_HOME || join(homedir(), ".ahoy-player");
+const bundledDemoPath = join(dirname(new URL(import.meta.url).pathname), "assets", "ahoy-demo.mp3");
+const demoDirectory = join(appHome, "demo");
 const libraryPath = join(appHome, "library.json");
 const useColor = Boolean(process.stdout.isTTY && !process.env.NO_COLOR);
 const tint = (code, value) => useColor ? `\x1b[${code}m${value}\x1b[0m` : value;
@@ -83,6 +85,13 @@ export async function scanDirectories(directories) {
   library.updatedAt = new Date().toISOString();
   await saveLibrary(library);
   return { added, updated, total: library.tracks.length };
+}
+
+export async function installDemo(destinationDirectory = demoDirectory) {
+  await mkdir(destinationDirectory, { recursive: true });
+  const destination = join(destinationDirectory, "Ahoy - Demo.mp3");
+  await copyFile(bundledDemoPath, destination);
+  return { destination, result: await scanDirectories([demoDirectory]) };
 }
 
 function printTracks(tracks) {
@@ -217,7 +226,7 @@ async function tui() {
 }
 
 function help() {
-  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy scan <folder...>      add MP3s from local folders\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n\nmacOS uses the built-in afplay. Linux uses mpv, VLC (cvlc), or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
+  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy scan <folder...>      add MP3s from local folders\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n\nmacOS uses the built-in afplay. Linux uses mpv, VLC (cvlc), or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
 }
 
 export async function main(args = process.argv.slice(2)) {
@@ -226,6 +235,13 @@ export async function main(args = process.argv.slice(2)) {
   if (command === "scan") {
     if (!rest.length) throw new Error("Choose at least one folder, for example: ahoy scan ~/Music");
     const result = await scanDirectories(rest);
+    console.log(`${accent("Library updated")} · ${result.added} added, ${result.updated} refreshed, ${result.total} total`);
+    return;
+  }
+  if (command === "demo") {
+    const destinationDirectory = rest.includes("--music") ? join(homedir(), "Music", "Ahoy") : demoDirectory;
+    const { destination, result } = await installDemo(destinationDirectory);
+    console.log(`${accent("Demo installed")} · ${destination}`);
     console.log(`${accent("Library updated")} · ${result.added} added, ${result.updated} refreshed, ${result.total} total`);
     return;
   }

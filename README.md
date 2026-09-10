@@ -54,12 +54,18 @@ The terminal host is a small, local-first companion inspired by classic terminal
 ```bash
 cd ~/ahoyMp3
 npm run ahoy -- scan ~/Music
+npm run ahoy -- demo
+npm run ahoy -- demo --music
 npm run ahoy -- library
 npm run ahoy -- search "ambient"
 npm run ahoy -- tui
 ```
 
 `tui` supports arrow keys (or `j`/`k`), Enter to play, Space to stop, and `q` to quit. Its metadata index is stored only in `~/.ahoy-player/library.json`; it never uploads your audio.
+
+`ahoy demo` copies a short bundled MP3 into `~/.ahoy-player/demo`, indexes it, and makes it available to play immediately with `npm run ahoy -- play demo` (or from the TUI). This is useful for testing the CLI before adding personal music.
+
+Use `ahoy demo --music` to copy it into `~/Music/Ahoy` instead.
 
 On macOS, playback uses the built-in `afplay`, so it works in Terminal with no additional player package. On Linux it uses the first available of `mpv`, `cvlc` (VLC), or `ffplay`; install one of those with your distribution's package manager. The CLI currently reads labels from filenames/folders and plays local MP3 paths—the native tag-reader and richer queue are the next iteration.
 
