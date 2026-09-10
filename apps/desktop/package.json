@@ -3,7 +3,11 @@
   "private": true,
   "version": "0.1.1",
   "description": "Local-first Ahoy music player for Linux, macOS, and Windows.",
-  "author": "Ahoy",
+  "author": {
+    "name": "Ahoy",
+    "email": "alex@ahoy.ooo"
+  },
+  "homepage": "https://github.com/oooAHOYooo/ahoy-player",
   "desktopName": "ahoy-player",
   "type": "module",
   "main": "dist-electron/main.js",
@@ -19,8 +23,10 @@
     "mac": { "category": "public.app-category.music", "identity": "-", "target": ["dmg", "zip"] },
     "linux": {
       "category": "AudioVideo",
+      "maintainer": "Ahoy <alex@ahoy.ooo>",
+      "packageName": "ahoy-player",
       "syncDesktopName": true,
-      "target": ["AppImage", "dir"],
+      "target": ["AppImage", "pacman", "dir"],
       "artifactName": "Ahoy-Player-${version}-build.${buildNumber}-${arch}.${ext}"
     }
   },
@@ -31,7 +37,7 @@
     "build": "vite build && npm run build:electron",
     "package:mac": "npm run build && electron-builder --mac dmg zip",
     "package:mac:x64": "npm run build && electron-builder --mac dmg zip --x64",
-    "package:linux": "npm run build && electron-builder --linux AppImage dir",
+    "package:linux": "npm run build && electron-builder --linux AppImage pacman dir",
     "start": "electron .",
     "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.electron.json --noEmit"
   },

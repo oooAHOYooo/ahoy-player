@@ -3,32 +3,86 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#eef4f1" />
-    <title>Download Ahoy Player</title>
+    <meta name="theme-color" content="#f5f0e7" />
+    <meta name="description" content="Download Ahoy Player, a calm local-first music player for macOS and Linux." />
+    <title>Download Ahoy Player — Your music, in its place.</title>
     <style>
-      :root { color: #203129; background: #eef4f1; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif; }
-      * { box-sizing: border-box; } body { min-height: 100vh; margin: 0; background: radial-gradient(circle at 78% 8%, #cfe4fb, transparent 32rem), radial-gradient(circle at 12% 90%, #dfead6, transparent 30rem), #eef4f1; }
-      main { width: min(100% - 2rem, 70rem); min-height: 100vh; margin: 0 auto; padding: 1.2rem 0 3rem; }
-      nav { display: flex; align-items: center; justify-content: space-between; padding: .2rem 0 1rem; border-bottom: 1px solid #cbd8d0; }
-      .brand { display: flex; gap: .7rem; align-items: center; color: #203129; font-weight: 800; letter-spacing: .1em; } .brand img { width: 2.7rem; height: 2.7rem; object-fit: contain; padding: .3rem; border-radius: .7rem; background: rgba(255,255,255,.72); box-shadow: 0 .3rem 1rem #a6bed044; } .brand small { display: block; margin-top: .25rem; color: #75877c; font-size: .52rem; letter-spacing: .06em; }
-      nav a, .ghost { color: #52655a; text-decoration: none; font-size: .68rem; } nav a:hover { color: #087cf0; }
-      .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 3rem; align-items: center; padding: clamp(4rem, 12vh, 8rem) 0 4rem; } .eyebrow { color: #6d8274; font: 600 .58rem ui-monospace, monospace; letter-spacing: .08em; } h1 { max-width: 36rem; margin: .9rem 0 1.2rem; font-size: clamp(3rem, 8vw, 6.8rem); line-height: .9; letter-spacing: -.09em; } h1 em { color: #087cf0; font-style: normal; } .copy { max-width: 29rem; color: #687c70; font-size: .95rem; line-height: 1.55; letter-spacing: -.01em; }
-      .hero-logo { display: block; width: 8rem; height: 8rem; margin-bottom: 2rem; object-fit: contain; padding: .7rem; border-radius: 1.6rem; background: rgba(255,255,255,.7); box-shadow: 0 1rem 2.5rem #78948722, inset 0 1px #fff; }
-      .downloads { display: grid; gap: .7rem; padding: 1.1rem; border: 1px solid #c8d7ce; border-radius: 1.1rem; background: rgba(255,255,255,.48); box-shadow: 0 1.2rem 3rem #657e6c18, inset 0 1px #fff; backdrop-filter: blur(20px); } .downloads h2 { margin: .2rem 0 .7rem; font-size: 1.2rem; letter-spacing: -.04em; } .download { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem; border: 1px solid #c8d7ce; border-radius: .7rem; background: rgba(255,255,255,.55); color: #26382e; text-decoration: none; } .download:hover { border-color: #087cf0; box-shadow: 0 .4rem 1.2rem #087cf01c; } .download strong, .download small { display: block; } .download small { margin-top: .25rem; color: #718278; font: .55rem ui-monospace, monospace; } .download b { color: #087cf0; font-size: .7rem; }
-      .links { display: flex; flex-wrap: wrap; gap: .6rem; padding-top: 1rem; border-top: 1px solid #cbd8d0; } .links a { padding: .65rem .8rem; border: 1px solid #c8d7ce; border-radius: .55rem; color: #52655a; background: rgba(255,255,255,.35); text-decoration: none; font-size: .65rem; } .links a:hover { color: #087cf0; background: rgba(255,255,255,.7); }
-      footer { display: flex; justify-content: space-between; gap: 1rem; padding-top: 4rem; color: #839289; font: .55rem ui-monospace, monospace; letter-spacing: .04em; } footer a { color: #64786b; text-decoration: none; } footer a:hover { color: #087cf0; }
-      @media (max-width: 700px) { .hero { grid-template-columns: 1fr; gap: 2rem; padding-top: 4rem; } h1 { font-size: 4rem; } }
+      :root { color: #172d29; background: #f5f0e7; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { min-width: 20rem; min-height: 100vh; margin: 0; background: radial-gradient(circle at 83% 4%, #c6e5dd 0, transparent 23rem), radial-gradient(circle at 6% 85%, #f5cf8f 0, transparent 25rem), #f5f0e7; }
+      a { color: inherit; }
+      main { width: min(100% - 2.5rem, 74rem); margin: auto; }
+      nav { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 0; border-bottom: 1px solid #17342e22; }
+      .brand { display: inline-flex; align-items: center; gap: .65rem; color: #172d29; text-decoration: none; font-size: .8rem; font-weight: 850; letter-spacing: .13em; }
+      .brand img { width: 2.6rem; height: 2.6rem; padding: .27rem; object-fit: contain; border: 1px solid #17342e12; border-radius: .75rem; background: #fffdf8; box-shadow: 0 .3rem .8rem #183a3020; }
+      .brand small { display: block; margin-top: .17rem; color: #65766d; font-size: .48rem; font-weight: 700; letter-spacing: .09em; }
+      .nav-link { color: #3d5650; font-size: .78rem; font-weight: 700; text-decoration: none; }
+      .nav-link:hover, .inline-link:hover { color: #007d77; }
+      .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(23rem, .82fr); gap: clamp(2.5rem, 7vw, 7rem); align-items: center; padding: clamp(4rem, 11vh, 8.5rem) 0 clamp(3rem, 7vh, 5.5rem); }
+      .eyebrow { color: #3c6d63; font: 750 .64rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .095em; }
+      h1 { max-width: 38rem; margin: .85rem 0 1.35rem; font-family: Georgia, "Times New Roman", serif; font-size: clamp(3.35rem, 7.3vw, 6.6rem); font-weight: 500; line-height: .88; letter-spacing: -.075em; }
+      h1 em { color: #007d77; font-style: italic; }
+      .intro { max-width: 31rem; margin: 0; color: #49605a; font-size: clamp(1rem, 1.25vw, 1.13rem); line-height: 1.6; }
+      .promises { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.75rem; }
+      .promise { padding: .48rem .68rem; border: 1px solid #17342e1a; border-radius: 999px; background: #fffaf1a8; color: #456059; font-size: .7rem; font-weight: 700; }
+      .download-panel { position: relative; padding: 1.25rem; overflow: hidden; border: 1px solid #17342e2b; border-radius: 1.35rem; background: #fffdf8c9; box-shadow: 0 1.5rem 3.5rem #4f675523, inset 0 1px #fff; backdrop-filter: blur(14px); }
+      .download-panel::after { position: absolute; top: -4rem; right: -4rem; width: 11rem; height: 11rem; border-radius: 50%; background: #97d9cb55; content: ""; }
+      .panel-head { position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin: .15rem 0 1.15rem; }
+      h2 { margin: .35rem 0 0; font-family: Georgia, "Times New Roman", serif; font-size: 1.8rem; font-weight: 500; letter-spacing: -.045em; }
+      .version { padding: .35rem .48rem; border-radius: .35rem; background: #e4f3ed; color: #246154; font: 700 .58rem ui-monospace, monospace; white-space: nowrap; }
+      .downloads { position: relative; z-index: 1; display: grid; gap: .62rem; }
+      .download { display: grid; grid-template-columns: 2.25rem 1fr auto; gap: .75rem; align-items: center; padding: .8rem; border: 1px solid #17342e20; border-radius: .83rem; background: #fffefa; color: #1d3530; text-decoration: none; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+      .download:hover { transform: translateY(-2px); border-color: #007d77; box-shadow: 0 .6rem 1.2rem #1a59571c; }
+      .download:focus-visible, .links a:focus-visible, .nav-link:focus-visible { outline: 3px solid #e99939; outline-offset: 3px; }
+      .os-icon { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border-radius: .55rem; background: #eef4ef; color: #057a73; font-size: 1.1rem; font-weight: 800; }
+      .download strong, .download small { display: block; }
+      .download strong { font-size: .86rem; letter-spacing: -.02em; }
+      .download small { margin-top: .15rem; color: #6a7a73; font: .61rem/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .arrow { color: #007d77; font-size: 1.2rem; font-weight: 600; }
+      .install-note { position: relative; z-index: 1; margin: .9rem .2rem .1rem; color: #687a72; font-size: .7rem; line-height: 1.5; }
+      .install-note strong { color: #3b544d; }
+      .after-hero { display: grid; grid-template-columns: .8fr 1.2fr; gap: 1rem; padding: 1rem 0 2rem; border-top: 1px solid #17342e20; }
+      .after-hero p { margin: 0; color: #5d7068; font-size: .78rem; line-height: 1.55; }
+      .after-hero strong { display: block; margin-bottom: .2rem; color: #28443d; font-size: .7rem; letter-spacing: .04em; text-transform: uppercase; }
+      .links { display: flex; flex-wrap: wrap; gap: .55rem; justify-content: flex-end; align-content: start; }
+      .links a { padding: .62rem .75rem; border: 1px solid #17342e22; border-radius: .5rem; background: #fffaf188; color: #456059; font-size: .72rem; font-weight: 700; text-decoration: none; transition: border-color .15s ease, color .15s ease; }
+      .links a:hover { border-color: #007d77; color: #007d77; }
+      footer { display: flex; justify-content: space-between; gap: 1rem; padding: 1.5rem 0 2.5rem; border-top: 1px solid #17342e20; color: #718077; font: .59rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .035em; }
+      footer a { color: #4e675f; text-decoration: none; }
+      @media (max-width: 760px) { main { width: min(100% - 1.5rem, 38rem); } .hero { grid-template-columns: 1fr; gap: 2.3rem; padding: 4.2rem 0 3.5rem; } h1 { font-size: clamp(3.4rem, 15vw, 5.5rem); } .after-hero { grid-template-columns: 1fr; } .links { justify-content: flex-start; } }
+      @media (max-width: 430px) { nav { padding: .9rem 0; } .nav-link { font-size: .7rem; } .download-panel { padding: 1rem; } .download { grid-template-columns: 2rem 1fr auto; padding: .68rem; } .os-icon { width: 2rem; height: 2rem; } footer { flex-direction: column; } }
     </style>
   </head>
   <body>
     <main>
-      <nav><a class="brand" href="/"><img src="https://storage.googleapis.com/ahoy-dynamic-content/misc/updatedAhoy_A.png" alt="Ahoy logo" onerror="this.onerror=null;this.src='/nautical-seagull-silkscreen.png'" /><span>AHOY<small>LOCAL PLAYER</small></span></a><a href="/">Open player →</a></nav>
-      <section class="hero">
-        <div><img class="hero-logo" src="https://storage.googleapis.com/ahoy-dynamic-content/misc/updatedAhoy_A.png" alt="Ahoy logo" onerror="this.onerror=null;this.src='/nautical-seagull-silkscreen.png'" /><span class="eyebrow">A PRIVATE MUSIC LIBRARY FOR MAC AND LINUX</span><h1>Your music,<br /><em>in its place.</em></h1><p class="copy">A calm, local-first player for the music you keep close. Import MP3s, browse your library, and open the compact Ahoy Deck whenever you want the classic player experience.</p></div>
-        <section class="downloads"><span class="eyebrow">DOWNLOAD AHOY PLAYER</span><h2>Choose your platform</h2><a class="download" href="https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.1.0/Ahoy.Player-0.1.0-arm64.dmg"><span><strong>Apple silicon</strong><small>Apple M1 / M2 / M3 / M4 · .dmg</small></span><b>↓</b></a><a class="download" href="https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.1.0/Ahoy.Player-0.1.0.dmg"><span><strong>Intel Mac</strong><small>Intel processors · .dmg</small></span><b>↓</b></a><a class="download" href="https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.1.1/Ahoy-Player-0.1.1-build.1-x86_64.AppImage"><span><strong>Linux</strong><small>64-bit Linux · AppImage · build 1</small></span><b>↓</b></a><p class="ghost">Linux build 1 · download, make executable, then open. Unsigned test builds may require an extra confirmation.</p></section>
+      <nav aria-label="Main navigation">
+        <a class="brand" href="/"><img src="https://storage.googleapis.com/ahoy-dynamic-content/misc/updatedAhoy_A.png" alt="Ahoy logo" onerror="this.onerror=null;this.src='/nautical-seagull-silkscreen.png'" /><span>AHOY<small>LOCAL PLAYER</small></span></a>
+        <a class="nav-link" href="/">Open web player <span aria-hidden="true">→</span></a>
+      </nav>
+      <section class="hero" aria-labelledby="page-title">
+        <div>
+          <span class="eyebrow">LOCAL-FIRST MUSIC PLAYER · MACOS + LINUX</span>
+          <h1 id="page-title">Your music,<br /><em>in its place.</em></h1>
+          <p class="intro">A calm player for the music you keep close. Import your files, browse your library, and bring up the compact Ahoy Deck whenever the mood calls for it.</p>
+          <div class="promises" aria-label="Ahoy Player highlights"><span class="promise">Your library stays yours</span><span class="promise">No account required</span><span class="promise">Made for local audio</span></div>
+        </div>
+        <section class="download-panel" aria-labelledby="download-title">
+          <div class="panel-head"><div><span class="eyebrow">DOWNLOAD AHOY PLAYER</span><h2 id="download-title">Pick your system</h2></div><span class="version">LATEST BUILDS</span></div>
+          <div class="downloads">
+            <a class="download" href="https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.1.0/Ahoy.Player-0.1.0-arm64.dmg"><span class="os-icon" aria-hidden="true">⌘</span><span><strong>Apple silicon</strong><small>M1, M2, M3, or M4 · DMG · v0.1.0</small></span><span class="arrow" aria-hidden="true">↓</span></a>
+            <a class="download" href="https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.1.0/Ahoy.Player-0.1.0.dmg"><span class="os-icon" aria-hidden="true">⌘</span><span><strong>Intel Mac</strong><small>Intel processors · DMG · v0.1.0</small></span><span class="arrow" aria-hidden="true">↓</span></a>
+            <a class="download" href="https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.1.1/Ahoy-Player-0.1.1-build.1-x64.pacman"><span class="os-icon" aria-hidden="true">◇</span><span><strong>Arch Linux</strong><small>Arch, EndeavourOS, Manjaro &amp; Omarchy · Pacman package · v0.1.1</small></span><span class="arrow" aria-hidden="true">↓</span></a>
+            <a class="download" href="https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.1.1/Ahoy-Player-0.1.1-build.1-x86_64.AppImage"><span class="os-icon" aria-hidden="true">◇</span><span><strong>Other Linux</strong><small>64-bit Linux · AppImage · v0.1.1</small></span><span class="arrow" aria-hidden="true">↓</span></a>
+          </div>
+          <p class="install-note"><strong>Arch Linux:</strong> open the downloaded package to install Ahoy. <strong>Other Linux:</strong> AppImages must be marked executable once before opening. Early unsigned builds may ask for an extra confirmation.</p>
+        </section>
       </section>
-      <div class="links"><a href="/player.html">Try the browser preview</a><a href="https://github.com/oooAHOYooo/ahoy-player">View source on GitHub</a><a href="https://github.com/oooAHOYooo/ahoy-player/releases">All releases</a></div>
-      <footer><span>AHOY PLAYER · LOCAL AUDIO · YOUR LIBRARY STAYS YOURS</span><a href="mailto:hello@ahoy.ooo">Contact Ahoy →</a></footer>
+      <section class="after-hero" aria-label="More ways to explore Ahoy">
+        <p><strong>Not ready to install?</strong> Take the player for a spin in the browser, or look through every published build and its release notes.</p>
+        <div class="links"><a href="/player.html">Try the browser preview</a><a href="https://github.com/oooAHOYooo/ahoy-player/releases">All releases</a><a href="https://github.com/oooAHOYooo/ahoy-player">Source on GitHub</a></div>
+      </section>
+      <footer><span>AHOY PLAYER · LOCAL AUDIO · YOUR LIBRARY STAYS YOURS</span><a class="inline-link" href="mailto:hello@ahoy.ooo">Contact Ahoy <span aria-hidden="true">→</span></a></footer>
     </main>
   </body>
 </html>
