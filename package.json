@@ -2,7 +2,7 @@
   "name": "ahoy-player",
   "private": true,
   "version": "0.1.1",
-  "description": "Local-first Ahoy Player monorepo with desktop, touch, TV, and future console shells.",
+  "description": "Local-first Ahoy Player monorepo with GUI and CLI products.",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -10,7 +10,6 @@
   "scripts": {
     "dev:desktop": "npm run dev --workspace @ahoy/player-desktop",
     "dev:web": "npm run dev --workspace @ahoy/player-web",
-    "dev:kiosk": "npm run dev --workspace @ahoy/player-linux-kiosk",
     "ahoy": "npm run start --workspace @ahoy/player-terminal --",
     "dev:terminal": "npm run start --workspace @ahoy/player-terminal -- tui",
     "build": "npm run build --workspaces --if-present",

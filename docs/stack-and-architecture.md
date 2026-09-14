@@ -68,12 +68,12 @@ The renderer never imports Node or Electron APIs directly.
 - uses touch-sized layout and the shared DOM/gamepad input layer
 - later chooses durable browser file handles or IndexedDB media storage
 
-### Linux kiosk
+### Terminal CLI/TUI
 
-- owns big-screen layout, remote conventions, and boot/full-screen behavior
-- can accept a launcher-injected managed-folder bridge
-- uses browser selection only as a development fallback
-- later supplies hardware-specific audio, mount discovery, and watchdog behavior
+- owns folder scanning and terminal browsing
+- provides keyboard-first navigation and local playback
+- stores its metadata index in the user's local Ahoy directory
+- does not start or depend on Electron
 
 ### Xbox boundary
 

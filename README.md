@@ -1,8 +1,8 @@
 # Ahoy Player
 
-Ahoy Player is one local-first music product with separate platform hosts. Its shared behavior lives in TypeScript packages; Electron, the touch PWA, the Linux TV kiosk, and a future Xbox host each own their platform APIs.
+Ahoy Player is a local-first music product with two user-facing products: a GUI player and a terminal player. The GUI has desktop and browser hosts; shared behavior lives in TypeScript packages while each host owns its platform APIs.
 
-The first milestone imports MP3 files, reads embedded ID3 metadata locally, fills any missing labels from filenames and folders, detects duplicates, persists library metadata, and drives every screen through the same Ahoy Dial action model. The web host now plays imported files through the browser audio engine; desktop and kiosk hosts still use the simulated adapter until their native playback paths are connected.
+The first milestone imports MP3 files, reads embedded ID3 metadata locally, fills any missing labels from filenames and folders, detects duplicates, persists library metadata, and drives every GUI screen through the same Ahoy Dial action model. The web host plays imported files through the browser audio engine; desktop playback is the next native integration step.
 
 ## Run it
 
@@ -23,11 +23,10 @@ npm run dev:desktop
 
 The desktop library keeps playback in a compact bottom dock. Choose **Open Deck** (or press `D`) to open the separate playback window. The Electron host creates or focuses one Deck window rather than duplicating it.
 
-The touch PWA and TV kiosk run independently:
+The browser GUI runs independently:
 
 ```bash
 npm run dev:web
-npm run dev:kiosk -- --host 0.0.0.0
 ```
 
 Run the built desktop host:
@@ -36,16 +35,6 @@ Run the built desktop host:
 npm run build --workspace @ahoy/player-desktop
 npm run start --workspace @ahoy/player-desktop
 ```
-
-Preview a production kiosk bundle for a Linux media box:
-
-```bash
-npm run build --workspace @ahoy/player-linux-kiosk
-npm run preview --workspace @ahoy/player-linux-kiosk -- --host 127.0.0.1 --port 4174
-chromium --kiosk http://127.0.0.1:4174
-```
-
-The Chromium command is an example launcher, not a complete appliance image. Autostart, remote administration, display rotation, and hardware audio selection belong to the Linux image/service configuration.
 
 ## Terminal player (macOS and Linux)
 
@@ -75,8 +64,7 @@ On macOS, playback uses the built-in `afplay`, so it works in Terminal with no a
 apps/
   desktop/          Electron main/preload + React desktop renderer
   device-web/       installable touch/web PWA
-  linux-kiosk/      big-screen React shell for a Linux media box
-  terminal/         planned keyboard-first CLI/TUI host using shared behavior
+  terminal/         keyboard-first CLI/TUI host using shared behavior
   xbox-shell/       boundary document only; no pretend desktop-compatible package
 packages/
   core/             canonical schema, reducers, actions, and adapter contracts
@@ -106,7 +94,7 @@ docs/
 
 Re-importing a file with the same content fingerprint does not create a duplicate. If newly read embedded tags are available, its existing local record is refreshed in place.
 
-The Electron bridge uses the native file dialog and SHA-256 hashes. The PWA hashes browser-selected file bytes with Web Crypto. A real Linux launcher can inject `window.ahoyKiosk.chooseMp3Files()`; the development kiosk falls back to the browser picker.
+The Electron bridge uses the native file dialog and SHA-256 hashes. The PWA hashes browser-selected file bytes with Web Crypto.
 
 ### Ahoy Dial
 
@@ -123,7 +111,7 @@ Keyboard and remote-style arrows turn the current list, Enter selects, Escape/Ba
 
 ### Persistence and playback
 
-`PlayerSnapshot` is shared; desktop, PWA, and kiosk currently persist it through host-keyed localStorage adapters. The adapter's optional subscription channel keeps the desktop library and Deck popup synchronized in both directions. The playback queue and state machine are shared pure reducers. The web host uses `BrowserAudioPlaybackAdapter` with browser object URLs; desktop and kiosk still use `SimulatedPlaybackAdapter` pending native playback work.
+`PlayerSnapshot` is shared; desktop and PWA persist it through host-keyed localStorage adapters. The adapter's optional subscription channel keeps the desktop library and Deck popup synchronized in both directions. The playback queue and state machine are shared pure reducers. The web host uses `BrowserAudioPlaybackAdapter` with browser object URLs; desktop uses the simulated adapter pending native playback work.
 
 Only normalized library metadata and opaque locators are persisted in the player snapshot. The web adapter also stores imported browser `File` blobs in IndexedDB, so normal browser reloads and PWA restarts can continue to play them. Browser storage can still be cleared or evicted by the user/browser; the File System Access API remains a future enhancement for explicit folder permissions and larger libraries.
 
