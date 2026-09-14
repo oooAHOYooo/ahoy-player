@@ -25,41 +25,26 @@ Ahoy Player is a local-first music library and MP3 player. It combines a calm, g
 - The desktop-style menu bar exposes File, Edit, View, Playback, Window, and Help commands.
 - A compact classic-player strip provides the Winamp-inspired now-playing view.
 
-### macOS desktop app
+### Native desktop app
 
-- Electron host in `apps/desktop`.
-- Native file picker, local metadata inspection, local SHA-256 fingerprinting, and a separate Ahoy Deck window.
-- Build and run:
-
-```bash
-npm run build --workspace @ahoy/player-desktop
-npm run start --workspace @ahoy/player-desktop
-```
-
-- Package Apple Silicon installers:
+- Rust + Slint host in `apps/native`; no Electron, browser engine, or WebView.
+- Native file picker, local metadata inspection, local SHA-256 fingerprinting, and Rodio playback.
+- Build and run on Linux:
 
 ```bash
-npm run package:mac --workspace @ahoy/player-desktop
+cargo test --workspace
+cargo run -p ahoy-player
+cargo build --release -p ahoy-player
 ```
 
-- Package Intel installers:
+- Package Debian artifacts:
 
 ```bash
-npm run package:mac:x64 --workspace @ahoy/player-desktop
+cargo install cargo-deb
+packaging/linux/build-deb.sh
 ```
 
-- Current builds use ad-hoc signing for private testing. Public distribution should eventually use an Apple Developer signing identity and notarization.
-
-### Linux desktop app
-
-- The same Electron host in `apps/desktop` is packaged as a 64-bit AppImage.
-- Package it with:
-
-```bash
-npm run package:linux --workspace @ahoy/player-desktop
-```
-
-- The Linux artifact name includes both the release version and build number, for example `Ahoy-Player-0.1.1-build.1-x86_64.AppImage`.
+The initial native release target is Linux. macOS and Windows are deliberately deferred until the core native workflow and packaging are stable.
 
 ## Visual system
 
@@ -75,7 +60,7 @@ npm run package:linux --workspace @ahoy/player-desktop
 - The canonical product model is one person, one local library, one player.
 - Imported audio is not uploaded by the web player.
 - Browser persistence uses local storage and browser-selected files.
-- Electron uses native file selection and local metadata/hash processing.
+- The native host uses platform file selection, local metadata/hash processing, and local audio output.
 - Transfer actions are currently interface scaffolding; remote transfer services are not yet implemented.
 
 ## Core capabilities
@@ -100,7 +85,7 @@ Render deploys the web surface as a static site from `main`.
 - Static site root: download hub
 - Optional browser player: `/player.html`
 
-GitHub Releases stores the macOS DMG/ZIP and Linux AppImage artifacts. Linux is released as `v0.1.1`, build `1`; existing macOS installers remain available from `v0.1.0` until the next macOS build is produced.
+GitHub Releases should initially store the Linux Debian artifact. AppImage, macOS, and Windows artifacts require separate packaging work after the native MVP is validated.
 
 ## Known limitations
 
@@ -119,6 +104,6 @@ Before a release:
 3. Run `npm run build`.
 4. Verify `/`, `/download.html`, and `/player.html` in the Render preview.
 5. Test light and dark player states.
-6. Build Intel and Apple Silicon macOS packages, then the Linux AppImage.
-7. Open a fresh DMG and test import, playback, and the separate deck.
-8. Update the GitHub Release assets and confirm the macOS and Linux download links.
+6. Build the Linux Debian package and verify its desktop entry.
+7. Launch the native binary and test import, playback, themes, and persistence.
+8. Update the GitHub Release assets and confirm the Linux download link.

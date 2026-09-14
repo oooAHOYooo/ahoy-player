@@ -1,124 +1,29 @@
 # Ahoy Player
 
-Ahoy Player is a local-first music product with two user-facing products: a GUI player and a terminal player. The GUI has desktop and browser hosts; shared behavior lives in TypeScript packages while each host owns its platform APIs.
+Ahoy has two native products: `apps/native`, a compiled Rust desktop player using Slint and Rodio; and `apps/terminal`, a CLI/TUI companion. `apps/device-web` is an optional browser/PWA experiment and is not the desktop foundation.
 
-The first milestone imports MP3 files, reads embedded ID3 metadata locally, fills any missing labels from filenames and folders, detects duplicates, persists library metadata, and drives every GUI screen through the same Ahoy Dial action model. The web host plays imported files through the browser audio engine; desktop playback is the next native integration step.
+## Native desktop player
 
-## Run it
+Install Rust stable, then run:
 
-Requirements: Node.js 20+ and npm 10+.
+```bash
+cargo test --workspace
+cargo run -p ahoy-player
+cargo build --release -p ahoy-player
+```
+
+The Linux binary is `target/release/ahoy-player`. It has native MP3 selection, SHA-256 duplicate detection, ID3 metadata with filename/folder fallbacks, local JSON persistence, and Rodio playback. Data lives below the platform local-data directory (normally `~/.local/share/ahoy-player`).
+
+Themes and layouts persist separately. Starter themes: Neutral, Winamp-inspired, Terminal green, Monochrome, and High contrast. Users can save, switch, import validated JSON, and export themes.
+
+For Debian packaging, install `cargo-deb` and run `packaging/linux/build-deb.sh`. AppImage output requires an additional bundler/icon pipeline and is not produced yet.
+
+## Terminal CLI/TUI
 
 ```bash
 npm install
-npm run typecheck
-npm test
-npm run build
-```
-
-Desktop development launches Vite and the Electron host together:
-
-```bash
-npm run dev:desktop
-```
-
-The desktop library keeps playback in a compact bottom dock. Choose **Open Deck** (or press `D`) to open the separate playback window. The Electron host creates or focuses one Deck window rather than duplicating it.
-
-The browser GUI runs independently:
-
-```bash
-npm run dev:web
-```
-
-Run the built desktop host:
-
-```bash
-npm run build --workspace @ahoy/player-desktop
-npm run start --workspace @ahoy/player-desktop
-```
-
-## Terminal player (macOS and Linux)
-
-The terminal host is a small, local-first companion inspired by classic terminal music players: scan a folder, browse it in the terminal, then play a selection without starting Electron.
-
-```bash
-cd ~/ahoyMp3
 npm run ahoy -- scan ~/Music
-npm run ahoy -- demo
-npm run ahoy -- demo --music
-npm run ahoy -- library
-npm run ahoy -- search "ambient"
 npm run ahoy -- tui
 ```
 
-`tui` supports arrow keys (or `j`/`k`), Enter to play, Space to stop, and `q` to quit. Its metadata index is stored only in `~/.ahoy-player/library.json`; it never uploads your audio.
-
-`ahoy demo` copies a short bundled MP3 into `~/.ahoy-player/demo`, indexes it, and makes it available to play immediately with `npm run ahoy -- play demo` (or from the TUI). This is useful for testing the CLI before adding personal music.
-
-Use `ahoy demo --music` to copy it into `~/Music/Ahoy` instead.
-
-On macOS, playback uses the built-in `afplay`, so it works in Terminal with no additional player package. On Linux it uses the first available of `mpv`, `cvlc` (VLC), or `ffplay`; install one of those with your distribution's package manager. The CLI currently reads labels from filenames/folders and plays local MP3 paths—the native tag-reader and richer queue are the next iteration.
-
-## Repository map
-
-```text
-apps/
-  desktop/          Electron main/preload + React desktop renderer
-  device-web/       installable touch/web PWA
-  terminal/         keyboard-first CLI/TUI host using shared behavior
-  xbox-shell/       boundary document only; no pretend desktop-compatible package
-packages/
-  core/             canonical schema, reducers, actions, and adapter contracts
-  media-pipeline/   filename normalization and duplicate detection
-  player-react/     shared React player model and semantic list UI
-  ui-dial/          Ahoy Dial control and DOM/gamepad input mapping
-  web-adapters/     browser picker, localStorage, and simulated playback adapters
-docs/
-  stack-and-architecture.md
-  ecosystem-architecture.md
-  mvp-web-checklist.md
-  megaprompts.md     historical design input, not build instructions
-  AHOY_MANIFESTO.md  living product compass and host strategy
-```
-
-## Milestone behavior
-
-### Import and normalization
-
-1. A host produces an `ImportCandidate` with an opaque locator, byte size, dates, MIME type, and optional SHA-256 fingerprint.
-2. Non-MP3 and zero-byte files are rejected.
-3. The pipeline never reads ID3 values into the local display model.
-4. It parses track number, artist, album, and title from common filename forms.
-5. Missing labels fall back to meaningful parent folders, then `Unknown Artist` / `Local Imports`.
-6. SHA-256 is the strong duplicate key. Hosts that cannot read bytes fall back to normalized filename plus byte size.
-7. Accepted tracks merge into the same normalized `LibraryRecord`; the batch produces a durable `ImportReceipt`.
-
-Re-importing a file with the same content fingerprint does not create a duplicate. If newly read embedded tags are available, its existing local record is refreshed in place.
-
-The Electron bridge uses the native file dialog and SHA-256 hashes. The PWA hashes browser-selected file bytes with Web Crypto.
-
-### Ahoy Dial
-
-The canonical actions are:
-
-- `turn(-1 | 1)`
-- `menu`
-- `select`
-- `back`
-- `next`
-- `play`
-
-Keyboard and remote-style arrows turn the current list, Enter selects, Escape/Backspace goes back, Space toggles play, `N` advances, and `M` returns to menu. Pointer/touch can press the five controls or rotate the ring. Standard gamepads map D-pad/axes plus A, B, X, Y, and Start into the same actions.
-
-### Persistence and playback
-
-`PlayerSnapshot` is shared; desktop and PWA persist it through host-keyed localStorage adapters. The adapter's optional subscription channel keeps the desktop library and Deck popup synchronized in both directions. The playback queue and state machine are shared pure reducers. The web host uses `BrowserAudioPlaybackAdapter` with browser object URLs; desktop uses the simulated adapter pending native playback work.
-
-Only normalized library metadata and opaque locators are persisted in the player snapshot. The web adapter also stores imported browser `File` blobs in IndexedDB, so normal browser reloads and PWA restarts can continue to play them. Browser storage can still be cleared or evicted by the user/browser; the File System Access API remains a future enhancement for explicit folder permissions and larger libraries.
-
-## Verification
-
-`npm test` covers filename parsing, path fallbacks, fingerprint keys, existing-library duplicates, same-batch duplicates, and invalid inputs. `npm run typecheck` checks every workspace, including Electron main/preload code. `npm run build` builds all three implemented hosts.
-
-See [stack-and-architecture.md](./docs/stack-and-architecture.md) for the shared/platform boundary and contract locations.
-See [ecosystem-architecture.md](./docs/ecosystem-architecture.md) for the AHOY domains, identity, library, player, and NFC-card model.
-See [mvp-web-checklist.md](./docs/mvp-web-checklist.md) for the current web deployment boundary and acceptance test.
+The native desktop application does not use Electron, Tauri, Chromium, WebView, React, HTML, CSS, or the kiosk host.

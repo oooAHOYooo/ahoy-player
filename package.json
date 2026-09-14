@@ -2,13 +2,15 @@
   "name": "ahoy-player",
   "private": true,
   "version": "0.1.1",
-  "description": "Local-first Ahoy Player monorepo with GUI and CLI products.",
+  "description": "Local-first Ahoy Player with a native Rust GUI and native CLI/TUI.",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev:desktop": "npm run dev --workspace @ahoy/player-desktop",
+    "dev:native": "cargo run -p ahoy-player",
+    "build:native": "cargo build --release -p ahoy-player",
+    "test:native": "cargo test --workspace",
     "dev:web": "npm run dev --workspace @ahoy/player-web",
     "ahoy": "npm run start --workspace @ahoy/player-terminal --",
     "dev:terminal": "npm run start --workspace @ahoy/player-terminal -- tui",
@@ -18,13 +20,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.17.30",
-    "electron-builder": "^26.15.3",
     "typescript": "^5.5.4",
     "vitest": "^2.1.9"
   },
-  "allowScripts": {
-    "electron@33.4.11": true,
-    "esbuild@0.21.5": true,
-    "electron-winstaller@5.4.0": true
-  }
+  "allowScripts": { "esbuild@0.21.5": true }
 }

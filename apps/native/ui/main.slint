@@ -1,0 +1,46 @@
+import { Button, CheckBox, HorizontalBox, VerticalBox } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    title: "Ahoy Player";
+    min-width: 760px; min-height: 540px; preferred-width: 1050px; preferred-height: 700px;
+    in-out property <[string]> track-items: [];
+    in-out property <string> now-playing: "Nothing playing";
+    in-out property <string> status: "Ready";
+    in-out property <string> theme-name: "Neutral";
+    in-out property <bool> playing: false;
+    in-out property <bool> show-library: true;
+    in-out property <color> background-color: #202428;
+    in-out property <color> surface-color: #2b3136;
+    in-out property <color> text-color: #edf1f3;
+    in-out property <color> accent-color: #75a7a0;
+    in-out property <color> border-color: #55616a;
+    callback import-files(); callback select-track(int); callback toggle-play(); callback next-track(); callback previous-track(); callback next-theme(); callback save-theme(); callback import-theme(); callback export-theme(); callback toggle-library();
+    background: background-color;
+    VerticalBox {
+        padding: 16px; spacing: 12px;
+        Text { text: "AHOY PLAYER"; color: text-color; font-size: 24px; font-weight: 700; }
+        HorizontalBox { spacing: 8px;
+            Button { text: "Import MP3 files"; clicked => { root.import-files(); } }
+            Button { text: "Previous"; clicked => { root.previous-track(); } }
+            Button { text: root.playing ? "Pause" : "Play"; clicked => { root.toggle-play(); } }
+            Button { text: "Next"; clicked => { root.next-track(); } }
+            Text { text: root.status; color: accent-color; vertical-alignment: center; }
+        }
+        Rectangle { visible: root.show-library; background: surface-color; border-color: border-color; border-width: 1px; border-radius: 6px; min-height: 265px;
+            VerticalBox { padding: 12px; Text { text: "Library"; color: text-color; font-size: 18px; }
+                VerticalBox {
+                    for track[index] in root.track-items: Rectangle {
+                        height: 38px; background: #00000000; border-radius: 4px;
+                        HorizontalBox { padding: 8px; Text { text: track; color: text-color; vertical-alignment: center; } }
+                        TouchArea { clicked => { root.select-track(index); } }
+                    }
+                }
+            }
+        }
+        Rectangle { background: surface-color; border-color: border-color; border-width: 1px; border-radius: 6px;
+            VerticalBox { padding: 12px; Text { text: "Now Playing"; color: accent-color; } Text { text: root.now-playing; color: text-color; font-size: 18px; } Text { text: "Queue and transport are native Rust state. Local files are never uploaded."; color: text-color; wrap: word-wrap; } }
+        }
+        HorizontalBox { spacing: 8px; CheckBox { text: "Library panel"; checked: root.show-library; toggled => { root.toggle-library(); } } Text { text: "Theme: " + root.theme-name; color: text-color; vertical-alignment: center; } Button { text: "Next theme"; clicked => { root.next-theme(); } } Button { text: "Save"; clicked => { root.save-theme(); } } Button { text: "Import JSON"; clicked => { root.import-theme(); } } Button { text: "Export JSON"; clicked => { root.export-theme(); } } }
+        Text { text: "Theme tokens: colors, typography, spacing, borders, shadows, radii, artwork, and controls persist in local JSON."; color: accent-color; wrap: word-wrap; }
+    }
+}

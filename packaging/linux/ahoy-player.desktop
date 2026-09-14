@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Ahoy Player
+Comment=Local-first native music player
+Exec=ahoy-player
+Icon=ahoy-player
+Categories=AudioVideo;Audio;Player;
+Terminal=false
