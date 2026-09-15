@@ -2,45 +2,62 @@ import { Button, CheckBox, HorizontalBox, VerticalBox } from "std-widgets.slint"
 
 export component AppWindow inherits Window {
     title: "Ahoy Player";
-    min-width: 760px; min-height: 540px; preferred-width: 1050px; preferred-height: 700px;
+    min-width: 860px; min-height: 600px; preferred-width: 1180px; preferred-height: 760px;
     in-out property <[string]> track-items: [];
-    in-out property <string> now-playing: "Nothing playing";
+    in-out property <string> now-playing: "Nothing queued";
     in-out property <string> status: "Ready";
     in-out property <string> theme-name: "Neutral";
     in-out property <bool> playing: false;
     in-out property <bool> show-library: true;
-    in-out property <color> background-color: #202428;
-    in-out property <color> surface-color: #2b3136;
-    in-out property <color> text-color: #edf1f3;
-    in-out property <color> accent-color: #75a7a0;
-    in-out property <color> border-color: #55616a;
+    in-out property <color> background-color: #f4f6f7;
+    in-out property <color> surface-color: #ffffff;
+    in-out property <color> text-color: #172126;
+    in-out property <color> accent-color: #197b78;
+    in-out property <color> border-color: #d9e1e3;
     callback import-files(); callback select-track(int); callback toggle-play(); callback next-track(); callback previous-track(); callback next-theme(); callback save-theme(); callback import-theme(); callback export-theme(); callback toggle-library();
-    background: background-color;
-    VerticalBox {
-        padding: 16px; spacing: 12px;
-        Text { text: "AHOY PLAYER"; color: text-color; font-size: 24px; font-weight: 700; }
-        HorizontalBox { spacing: 8px;
-            Button { text: "Import MP3 files"; clicked => { root.import-files(); } }
-            Button { text: "Previous"; clicked => { root.previous-track(); } }
-            Button { text: root.playing ? "Pause" : "Play"; clicked => { root.toggle-play(); } }
-            Button { text: "Next"; clicked => { root.next-track(); } }
-            Text { text: root.status; color: accent-color; vertical-alignment: center; }
-        }
-        Rectangle { visible: root.show-library; background: surface-color; border-color: border-color; border-width: 1px; border-radius: 6px; min-height: 265px;
-            VerticalBox { padding: 12px; Text { text: "Library"; color: text-color; font-size: 18px; }
-                VerticalBox {
-                    for track[index] in root.track-items: Rectangle {
-                        height: 38px; background: #00000000; border-radius: 4px;
-                        HorizontalBox { padding: 8px; Text { text: track; color: text-color; vertical-alignment: center; } }
-                        TouchArea { clicked => { root.select-track(index); } }
-                    }
+    background: root.background-color;
+
+    HorizontalBox {
+        spacing: 0px;
+        Rectangle {
+            width: 218px; background: #172326;
+            VerticalBox {
+                padding: 18px; spacing: 20px;
+                HorizontalBox { spacing: 10px; height: 40px;
+                    Rectangle { width: 34px; height: 34px; background: root.accent-color; border-radius: 17px; Text { text: "A"; color: #ffffff; font-size: 21px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; } }
+                    VerticalBox { spacing: 0px; Text { text: "AHOY"; color: #ffffff; font-size: 18px; font-weight: 700; } Text { text: "LOCAL PLAYER"; color: #9aabad; font-size: 9px; } }
                 }
+                Text { text: "YOUR LIBRARY"; color: #789092; font-size: 10px; font-weight: 700; }
+                VerticalBox { spacing: 5px;
+                    Rectangle { height: 36px; background: #2c4142; border-radius: 6px; HorizontalBox { padding: 10px; Text { text: "▦  Library"; color: #ffffff; vertical-alignment: center; } } }
+                    Rectangle { height: 36px; background: #00000000; HorizontalBox { padding: 10px; Text { text: "◌  Artists"; color: #b7c5c6; vertical-alignment: center; } } }
+                    Rectangle { height: 36px; background: #00000000; HorizontalBox { padding: 10px; Text { text: "□  Albums"; color: #b7c5c6; vertical-alignment: center; } } }
+                    Rectangle { height: 36px; background: #00000000; HorizontalBox { padding: 10px; Text { text: "↗  Recently added"; color: #b7c5c6; vertical-alignment: center; } } }
+                }
+                Text { text: "PLAYLISTS"; color: #789092; font-size: 10px; font-weight: 700; }
+                VerticalBox { spacing: 4px; Text { text: "◈  All music"; color: #b7c5c6; } Text { text: "◌  Open archive moods"; color: #b7c5c6; } Text { text: "+  New playlist"; color: #b7c5c6; } }
+                Rectangle { height: 1px; background: #385052; }
+                VerticalBox { spacing: 4px; Text { text: "LOCAL STORAGE"; color: #789092; font-size: 10px; font-weight: 700; } Text { text: "●  On this device"; color: #8ed0b0; font-size: 12px; } Text { text: "Files never leave this device"; color: #789092; font-size: 10px; } }
+                Text { text: ""; vertical-stretch: 1; }
+                Text { text: "AHOY PLAYER  ·  0.2"; color: #617577; font-size: 10px; }
             }
         }
-        Rectangle { background: surface-color; border-color: border-color; border-width: 1px; border-radius: 6px;
-            VerticalBox { padding: 12px; Text { text: "Now Playing"; color: accent-color; } Text { text: root.now-playing; color: text-color; font-size: 18px; } Text { text: "Queue and transport are native Rust state. Local files are never uploaded."; color: text-color; wrap: word-wrap; } }
+        VerticalBox {
+            padding: 18px; spacing: 18px;
+            Rectangle { height: 58px; background: root.surface-color; border-color: root.border-color; border-width: 1px; HorizontalBox { spacing: 12px; Text { text: "LIBRARY  /  OVERVIEW"; color: root.accent-color; font-size: 11px; font-weight: 700; vertical-alignment: center; } Text { text: ""; horizontal-stretch: 1; } Text { text: root.status; color: root.accent-color; vertical-alignment: center; } } }
+            HorizontalBox { spacing: 14px; VerticalBox { spacing: 4px; Text { text: "YOUR MUSIC"; color: root.accent-color; font-size: 11px; font-weight: 700; } Text { text: "A quieter way to listen."; color: root.text-color; font-size: 28px; font-weight: 700; } Text { text: "Local files, clean metadata, and no account required."; color: #6e7c81; font-size: 13px; } } Text { text: ""; horizontal-stretch: 1; } Button { text: "+  Import music"; clicked => { root.import-files(); } } }
+            Rectangle { height: 164px; background: root.surface-color; border-color: root.border-color; border-width: 1px; border-radius: 12px;
+                HorizontalBox { padding: 18px; spacing: 18px;
+                    Rectangle { width: 128px; background: root.accent-color; border-radius: 8px; VerticalBox { padding: 12px; Text { text: "AHOY"; color: #ffffff; font-size: 11px; font-weight: 700; } Text { text: "◒"; color: #ffffff; font-size: 52px; horizontal-alignment: center; vertical-alignment: center; } Text { text: "LOCAL SOUND"; color: #d8f1ed; font-size: 9px; horizontal-alignment: center; } } }
+                    VerticalBox { spacing: 5px; Text { text: "NOW PLAYING"; color: root.accent-color; font-size: 10px; font-weight: 700; } Text { text: root.now-playing; color: root.text-color; font-size: 21px; font-weight: 700; } Text { text: root.playing ? "Playing from your local library" : "Choose a track from your library"; color: #718085; font-size: 12px; } Text { text: ""; vertical-stretch: 1; } HorizontalBox { spacing: 7px; Button { text: "|◀"; clicked => { root.previous-track(); } } Button { text: root.playing ? "Ⅱ" : "▶"; clicked => { root.toggle-play(); } } Button { text: "▶|"; clicked => { root.next-track(); } } } }
+                    Text { text: ""; horizontal-stretch: 1; }
+                    VerticalBox { width: 170px; spacing: 8px; Text { text: "UP NEXT"; color: #718085; font-size: 10px; font-weight: 700; } Text { text: root.track-items.length > 1 ? root.track-items[1] : "Queue is clear"; color: root.text-color; wrap: word-wrap; } Text { text: ""; vertical-stretch: 1; } Text { text: "LOCAL QUEUE"; color: root.accent-color; font-size: 10px; } }
+                }
+            }
+            Rectangle { visible: root.show-library; background: root.surface-color; border-color: root.border-color; border-width: 1px; border-radius: 12px; vertical-stretch: 1;
+                VerticalBox { padding: 18px; spacing: 10px; HorizontalBox { height: 28px; Text { text: "COLLECTION"; color: root.text-color; font-size: 16px; font-weight: 700; } Text { text: ""; horizontal-stretch: 1; } Text { text: root.track-items.length + " tracks"; color: #718085; font-size: 12px; vertical-alignment: center; } } Rectangle { height: 28px; background: #eef3f3; border-radius: 5px; HorizontalBox { padding: 10px; Text { text: "#"; color: #718085; width: 36px; } Text { text: "TITLE"; color: #718085; font-size: 10px; font-weight: 700; } } } VerticalBox { spacing: 3px; vertical-stretch: 1; for track[index] in root.track-items: Rectangle { height: 38px; background: #00000000; border-radius: 6px; HorizontalBox { padding: 10px; Text { text: track; color: root.text-color; vertical-alignment: center; } } TouchArea { clicked => { root.select-track(index); } } } if root.track-items.length == 0: VerticalBox { alignment: center; Text { text: "Your library is waiting."; color: root.text-color; font-size: 17px; horizontal-alignment: center; } Text { text: "Import an MP3 to begin your local collection."; color: #718085; horizontal-alignment: center; } } } }
+            }
+            HorizontalBox { spacing: 8px; height: 34px; CheckBox { text: "Show library"; checked: root.show-library; toggled => { root.toggle-library(); } } Text { text: "Theme  ·  " + root.theme-name; color: #718085; vertical-alignment: center; } Text { text: ""; horizontal-stretch: 1; } Button { text: "Next theme"; clicked => { root.next-theme(); } } Button { text: "Save"; clicked => { root.save-theme(); } } Button { text: "Import JSON"; clicked => { root.import-theme(); } } Button { text: "Export JSON"; clicked => { root.export-theme(); } } }
         }
-        HorizontalBox { spacing: 8px; CheckBox { text: "Library panel"; checked: root.show-library; toggled => { root.toggle-library(); } } Text { text: "Theme: " + root.theme-name; color: text-color; vertical-alignment: center; } Button { text: "Next theme"; clicked => { root.next-theme(); } } Button { text: "Save"; clicked => { root.save-theme(); } } Button { text: "Import JSON"; clicked => { root.import-theme(); } } Button { text: "Export JSON"; clicked => { root.export-theme(); } } }
-        Text { text: "Theme tokens: colors, typography, spacing, borders, shadows, radii, artwork, and controls persist in local JSON."; color: accent-color; wrap: word-wrap; }
     }
 }

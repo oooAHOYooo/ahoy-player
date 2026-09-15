@@ -1,8 +1,24 @@
 # Ahoy Player
 
-Ahoy has two native products: `apps/native`, a compiled Rust desktop player using Slint and Rodio; and `apps/terminal`, a CLI/TUI companion. `apps/device-web` is an optional browser/PWA experiment and is not the desktop foundation.
+Ahoy has one desktop product: `apps/native`, a compiled Rust player using Slint and Rodio. The same Rust/Slint frontend is used on macOS and Linux; there is no Electron desktop application. `apps/terminal` is a separate CLI/TUI companion.
 
-## Native desktop player
+## Native desktop player (macOS + Linux)
+
+The native desktop player is the product source of truth. Develop and visually inspect it on macOS, then build the same Slint UI for Linux. Rust owns application state, local files, metadata, persistence, and audio; Slint owns the cross-platform presentation.
+
+On macOS, install Apple’s command-line tools and Rust once:
+
+```bash
+xcode-select --install
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+```
+
+Run the visual MVP with:
+
+```bash
+cargo run -p ahoy-player
+```
 
 Install Rust stable, then run:
 
@@ -26,4 +42,4 @@ npm run ahoy -- scan ~/Music
 npm run ahoy -- tui
 ```
 
-The native desktop application does not use Electron, Tauri, Chromium, WebView, React, HTML, CSS, or the kiosk host.
+The native desktop application does not use Electron, Tauri, Chromium, WebView, React, HTML, or CSS. `apps/device-web` is retained only as an optional browser experiment and is not part of the macOS/Linux desktop product.

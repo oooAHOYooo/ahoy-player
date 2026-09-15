@@ -2,11 +2,12 @@
 
 Updated 2026-09-14.
 
-The native desktop application builds successfully with Rust stable:
+The native desktop application is the shared macOS/Linux product and builds with Rust stable:
 
 - `cargo check -p ahoy-player`
 - `cargo test --workspace` — 8 Rust tests passed
 - `cargo build --release -p ahoy-player` — optimized Linux binary produced
+- `cargo build --release -p ahoy-player` — macOS release binary when run on macOS
 - `npm test -- --run` — 16 JavaScript tests passed
 - `npm run typecheck` — all workspaces passed
 
@@ -19,4 +20,4 @@ cargo install cargo-deb
 packaging/linux/build-deb.sh
 ```
 
-The current container does not provide `rustfmt`, so `cargo fmt --check` remains an environment follow-up. The application itself is intentionally launched manually on a graphical Linux session because this build environment has no desktop display available for a reliable GUI smoke test.
+The macOS development loop is the preferred visual workflow: run `cargo run -p ahoy-player` on a graphical Mac, iterate on `apps/native/ui/main.slint`, and then run the same Cargo target on Linux for platform smoke testing. The current container does not provide `rustfmt` or a desktop display, so GUI smoke testing remains a host follow-up.
