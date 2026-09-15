@@ -13,6 +13,9 @@ priority = "optional"
 depends = "$auto"
 assets = [
     ["target/release/ahoy-player", "usr/bin/", "755"],
+    ["packaging/linux/ahoy", "usr/bin/", "755"],
+    ["apps/terminal/ahoy.mjs", "usr/lib/ahoy-player-terminal/", "644"],
+    ["apps/terminal/assets/ahoy-demo.mp3", "usr/lib/ahoy-player-terminal/assets/", "644"],
     ["packaging/linux/ahoy-player.desktop", "usr/share/applications/", "644"],
 ]
 

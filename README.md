@@ -32,7 +32,20 @@ The Linux binary is `target/release/ahoy-player`. It has native MP3 selection, S
 
 Themes and layouts persist separately. Starter themes: Neutral, Winamp-inspired, Terminal green, Monochrome, and High contrast. Users can save, switch, import validated JSON, and export themes.
 
-For Debian packaging, install `cargo-deb` and run `packaging/linux/build-deb.sh`. AppImage output requires an additional bundler/icon pipeline and is not produced yet.
+## Linux packages
+
+One Linux installation supplies both commands:
+
+```bash
+ahoy-player # graphical player
+ahoy --help # terminal CLI/TUI
+```
+
+Both products use `~/.local/share/ahoy-player/library.json` (or `$XDG_DATA_HOME/ahoy-player`). The terminal companion automatically migrates its former `~/.ahoy-player/library.json` on first use; the old file is retained. The shared JSON is compatible with the native player, although terminal scans currently use filename/folder metadata rather than reading ID3 tags.
+
+For an Arch package, run `packaging/linux/build-arch.sh`; it produces a `target/ahoy-player-*.pkg.tar.*` package. It depends on Node.js for the current terminal implementation, and `mpv` or `ffplay` is needed for terminal playback. For Debian packaging, install `cargo-deb` and run `packaging/linux/build-deb.sh`.
+
+An AppImage is not produced or advertised as installing `ahoy` globally. It needs separate integration work.
 
 ## Terminal CLI/TUI
 

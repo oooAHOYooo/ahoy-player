@@ -6,7 +6,10 @@ import { homedir, platform, tmpdir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
-const appHome = process.env.AHOY_PLAYER_HOME || join(homedir(), ".ahoy-player");
+// This is deliberately the same path and JSON shape used by the native player.
+// AHOY_PLAYER_HOME remains useful for tests and portable installs.
+const appHome = process.env.AHOY_PLAYER_HOME || join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "ahoy-player");
+const legacyAppHome = join(homedir(), ".ahoy-player");
 const bundledDemoPath = join(dirname(new URL(import.meta.url).pathname), "assets", "ahoy-demo.mp3");
 const demoDirectory = join(appHome, "demo");
 const libraryPath = join(appHome, "library.json");
@@ -32,10 +35,48 @@ export function labelsForPath(filePath) {
 async function loadLibrary() {
   try {
     const parsed = JSON.parse(await readFile(libraryPath, "utf8"));
-    return Array.isArray(parsed.tracks) ? parsed : { version: 1, tracks: [] };
+    return normalizeLibrary(parsed);
   } catch (error) {
-    if (error.code === "ENOENT") return { version: 1, tracks: [] };
+    if (error.code === "ENOENT") return migrateLegacyLibrary();
     throw new Error(`Could not read ${libraryPath}: ${error.message}`);
+  }
+}
+
+function nativeTrack(track) {
+  const path = track.path;
+  const labels = labelsForPath(path);
+  const fingerprint = track.fingerprint || createHash("sha256").update(path).digest("hex");
+  return {
+    id: track.id?.startsWith("local:") ? track.id : `local:${fingerprint.slice(0, 24)}`,
+    path,
+    filename: track.filename || basename(path),
+    title: track.title || labels.title,
+    artist: track.artist || labels.artist,
+    album: track.album || labels.album,
+    track_number: track.track_number ?? null,
+    fingerprint,
+    duration_ms: track.duration_ms ?? null,
+    imported_at: track.imported_at || track.addedAt || String(Math.floor(Date.now() / 1000))
+  };
+}
+
+function normalizeLibrary(parsed) {
+  return {
+    schema_version: 1,
+    tracks: Array.isArray(parsed?.tracks) ? parsed.tracks.filter((track) => typeof track?.path === "string").map(nativeTrack) : []
+  };
+}
+
+async function migrateLegacyLibrary() {
+  const legacyPath = join(legacyAppHome, "library.json");
+  try {
+    const legacy = normalizeLibrary(JSON.parse(await readFile(legacyPath, "utf8")));
+    await saveLibrary(legacy);
+    console.error(`Migrated terminal library from ${legacyPath} to ${libraryPath}`);
+    return legacy;
+  } catch (error) {
+    if (error.code === "ENOENT") return { schema_version: 1, tracks: [] };
+    throw new Error(`Could not migrate ${legacyPath}: ${error.message}`);
   }
 }
 
@@ -73,16 +114,22 @@ export async function scanDirectories(directories) {
       const info = await stat(path);
       const existing = known.get(path);
       const labels = labelsForPath(path);
+      const fingerprint = createHash("sha256").update(await readFile(path)).digest("hex");
       const track = {
-        id: existing?.id || createHash("sha256").update(path).digest("hex").slice(0, 12),
-        path, ...labels, bytes: info.size, modifiedMs: Math.round(info.mtimeMs), addedAt: existing?.addedAt || new Date().toISOString()
+        id: existing?.id || `local:${fingerprint.slice(0, 24)}`,
+        path,
+        filename: basename(path),
+        ...labels,
+        track_number: existing?.track_number ?? null,
+        fingerprint,
+        duration_ms: existing?.duration_ms ?? null,
+        imported_at: existing?.imported_at || String(Math.floor(Date.now() / 1000))
       };
       if (existing) { Object.assign(existing, track); updated += 1; }
       else { library.tracks.push(track); known.set(path, track); added += 1; }
     }
   }
   library.tracks.sort((a, b) => a.artist.localeCompare(b.artist) || a.album.localeCompare(b.album) || a.title.localeCompare(b.title));
-  library.updatedAt = new Date().toISOString();
   await saveLibrary(library);
   return { added, updated, total: library.tracks.length };
 }

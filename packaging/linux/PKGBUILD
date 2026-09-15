@@ -1,0 +1,27 @@
+pkgname=ahoy-player
+pkgver=0.2.0
+pkgrel=1
+pkgdesc='Local-first music player with native GUI and terminal companion'
+arch=('x86_64')
+url='https://github.com/oooAHOYooo/ahoy-player'
+license=('MIT')
+depends=('alsa-lib' 'fontconfig' 'glibc' 'libxkbcommon' 'nodejs' 'wayland')
+optdepends=('mpv: audio playback for the ahoy terminal companion'
+            'ffmpeg: provides ffplay as an alternate terminal audio backend')
+source=("${pkgname}-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "${srcdir}/${pkgname}-${pkgver}"
+  cargo build --release --locked -p ahoy-player
+}
+
+package() {
+  cd "${srcdir}/${pkgname}-${pkgver}"
+  local cargo_target="${CARGO_TARGET_DIR:-target}"
+  install -Dm755 "${cargo_target}/release/ahoy-player" "${pkgdir}/usr/bin/ahoy-player"
+  install -Dm755 packaging/linux/ahoy "${pkgdir}/usr/bin/ahoy"
+  install -Dm644 apps/terminal/ahoy.mjs "${pkgdir}/usr/lib/ahoy-player-terminal/ahoy.mjs"
+  install -Dm644 apps/terminal/assets/ahoy-demo.mp3 "${pkgdir}/usr/lib/ahoy-player-terminal/assets/ahoy-demo.mp3"
+  install -Dm644 packaging/linux/ahoy-player.desktop "${pkgdir}/usr/share/applications/ahoy-player.desktop"
+}
