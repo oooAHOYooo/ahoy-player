@@ -1,0 +1,63 @@
+:root {
+  --ahoy-bg-app: #181a1d;
+  --ahoy-bg-window: #131518;
+  --ahoy-bg-sidebar: #191c1f;
+  --ahoy-bg-center: #16181b;
+  --ahoy-bg-card: #1f2226;
+  --ahoy-bg-dock: #181a1d;
+  --ahoy-bg-drawer: #1c1f23;
+  --ahoy-bg-deck: #1b1e22;
+  --ahoy-bg-status: #141619;
+
+  --ahoy-accent-teal: #2dd4bf;
+  --ahoy-accent-teal-dark: #0f766e;
+  --ahoy-accent-glow: rgba(45, 212, 191, 0.15);
+
+  --ahoy-text-main: #f3f4f6;
+  --ahoy-text-muted: #9ca3af;
+  --ahoy-text-dim: #6b7280;
+  --ahoy-text-dark: #4b5563;
+
+  --ahoy-border-subtle: rgba(255, 255, 255, 0.07);
+  --ahoy-border-hover: rgba(255, 255, 255, 0.14);
+
+  --ahoy-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ahoy-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  --user-color-1: #ffffee;
+  --user-color-2: #300585;
+  --user-color-3: #a99180;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--ahoy-bg-app);
+  color: var(--ahoy-text-main);
+  font-family: var(--ahoy-font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+button {
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+input[type="range"] {
+  accent-color: var(--ahoy-accent-teal);
+}
