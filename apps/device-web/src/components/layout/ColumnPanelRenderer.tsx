@@ -18,6 +18,7 @@ type ColumnPanelRendererProps = {
   onSelectNav: (id: NavItemId) => void;
   selectedAlbum: AlbumCardData;
   onSelectAlbum: (card: AlbumCardData) => void;
+  albums?: AlbumCardData[];
   nauticalThemes?: NauticalTheme[];
   activeThemeId?: string;
   onSelectTheme?: (themeId: string) => void;
@@ -35,6 +36,7 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
   onSelectNav,
   selectedAlbum,
   onSelectAlbum,
+  albums,
   nauticalThemes,
   activeThemeId,
   onSelectTheme,
@@ -52,6 +54,7 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
     case "grid":
       return (
         <AlbumGrid
+          albums={albums}
           selectedId={selectedAlbum.id}
           onSelectAlbum={onSelectAlbum}
         />

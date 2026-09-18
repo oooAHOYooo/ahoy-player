@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createEmptyLibrary } from "@ahoy/player-core";
 import {
   BrowserAudioPlaybackAdapter,
@@ -29,17 +29,64 @@ export function App() {
     playbackAdapter,
   });
 
+  // Sovereign AHOY ID & Entitlements state
+  const [ahoyId, setAhoyId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const qId = params.get("ahoy_id");
+      if (qId) {
+        localStorage.setItem("ahoy_id", qId);
+        return qId;
+      }
+      return localStorage.getItem("ahoy_id");
+    }
+    return null;
+  });
+
+  const [entitledAlbums, setEntitledAlbums] = useState<AlbumCardData[]>([]);
+
+  // Sync entitlements from AHOY Market
+  useEffect(() => {
+    if (!ahoyId) return;
+
+    const marketHost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+        ? "http://127.0.0.1:3020"
+        : "https://market.ahoy.ooo";
+
+    fetch(`${marketHost}/api/entitlements?ahoy_id=${encodeURIComponent(ahoyId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.tracks) && data.tracks.length > 0) {
+          const newCards: AlbumCardData[] = data.tracks.map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            artist: t.artist,
+            album: "AHOY Market Purchase",
+            coverType: "vinyl-beige" as const,
+            displayLabel: `AHOY Sovereign Unlock — ${t.artist} - ${t.title}`,
+            durationMs: (t.duration_seconds || 180) * 1000,
+            audioUrl: t.direct_audio_url || t.stream_url,
+          }));
+          setEntitledAlbums(newCards);
+        }
+      })
+      .catch((err) => console.error("Failed to sync AHOY Market entitlements:", err));
+  }, [ahoyId]);
+
+  const allAlbums: AlbumCardData[] = [...entitledAlbums, ...defaultMockAlbums];
+
   // Navigation state
   const [activeNav, setActiveNav] = useState<NavItemId>("artists");
 
   // 3-Column Customizable Workspace
-  // Default: Column 0 = Library, Column 1 = Grid, Column 2 = Queue (Queue shows first!)
   const { columns, setColumnPanel, swapColumns } = useWorkspaceColumns();
   const [draggingCol, setDraggingCol] = useState<number | null>(null);
   const [dragOverCol, setDragOverCol] = useState<number | null>(null);
 
   // Track selection state
-  const [selectedAlbum, setSelectedAlbum] = useState<AlbumCardData>(defaultMockAlbums[0]);
+  const [selectedAlbum, setSelectedAlbum] = useState<AlbumCardData>(allAlbums[0]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
 
@@ -63,6 +110,20 @@ export function App() {
     setSelectedAlbum(card);
     setIsPlaying(true);
     setPositionMs(0);
+
+    if (card.audioUrl) {
+      playbackAdapter.load({
+        id: card.id,
+        title: card.title,
+        artist: card.artist,
+        album: card.album,
+        uri: card.audioUrl,
+        durationMs: card.durationMs || 180000,
+      });
+      playbackAdapter.play();
+      setIsPlaying(true);
+      return;
+    }
 
     const libraryTrack = model.library.tracks.find(
       (t) => t.title.toLowerCase() === card.title.toLowerCase()
@@ -109,7 +170,13 @@ export function App() {
   return (
     <div className="ahoy-app-container">
       {/* Window Title Bar */}
-      <WindowTitleBar title="Ahoy Player" />
+      <WindowTitleBar
+        title={
+          ahoyId
+            ? `Ahoy Player — ⚓ AHOY ID: ${ahoyId} (${entitledAlbums.length} unlocked)`
+            : "Ahoy Player"
+        }
+      />
 
       {/* Main Workspace: 3 Customizable Columns + Dock */}
       <div className="ahoy-workspace-body">
@@ -174,6 +241,7 @@ export function App() {
                     onSelectNav={setActiveNav}
                     selectedAlbum={selectedAlbum}
                     onSelectAlbum={handleSelectAlbum}
+                    albums={allAlbums}
                     nauticalThemes={nauticalThemes}
                     activeThemeId={activeThemeId}
                     onSelectTheme={applyNauticalTheme}
