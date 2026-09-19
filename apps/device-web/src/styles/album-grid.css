@@ -115,3 +115,397 @@
 .ahoy-album-card:hover .ahoy-album-card-label {
   color: var(--ahoy-text-main);
 }
+
+/* Grid density modifier classes */
+.ahoy-album-grid--compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.ahoy-album-grid--standard {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.ahoy-album-grid--large {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+
+/* View Switcher Toolbar */
+.ahoy-grid-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ahoy-view-switcher-group {
+  display: flex;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--ahoy-border-subtle);
+}
+
+.ahoy-view-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #9ca3af;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.ahoy-view-switcher-btn:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.ahoy-view-switcher-btn.is-active {
+  background-color: var(--ahoy-accent-teal);
+  color: #0b1719;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(45, 212, 191, 0.3);
+}
+
+.ahoy-density-group {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.ahoy-density-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  background: transparent;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.ahoy-density-btn:hover {
+  color: #ffffff;
+}
+
+.ahoy-density-btn.is-active {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--ahoy-accent-teal);
+}
+
+/* 3D Cover Flow Stage */
+.ahoy-coverflow-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  outline: none;
+  user-select: none;
+}
+
+.ahoy-coverflow-stage {
+  position: relative;
+  width: 100%;
+  height: 380px;
+  perspective: 1000px;
+  perspective-origin: 50% 40%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.ahoy-coverflow-track {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  transform-style: preserve-3d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ahoy-coverflow-card {
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.35s ease;
+  transform-style: preserve-3d;
+  cursor: pointer;
+}
+
+.ahoy-coverflow-card-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  position: relative;
+  background-color: #1a2228;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ahoy-coverflow-card.is-center .ahoy-coverflow-card-inner {
+  border: 2px solid var(--ahoy-accent-teal);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 24px var(--ahoy-accent-glow);
+}
+
+.ahoy-coverflow-play-pill {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(11, 23, 25, 0.85);
+  backdrop-filter: blur(6px);
+  color: var(--ahoy-accent-teal);
+  border: 1px solid var(--ahoy-accent-teal);
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Floor Reflection */
+.ahoy-coverflow-reflection {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleY(-1) translateY(-6px);
+  border-radius: 10px;
+  overflow: hidden;
+  opacity: 0.35;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, transparent 60%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, transparent 60%);
+}
+
+.ahoy-coverflow-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 120;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: rgba(19, 29, 36, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.ahoy-coverflow-arrow:hover {
+  background-color: var(--ahoy-accent-teal);
+  color: #0c1926;
+  transform: translateY(-50%) scale(1.08);
+}
+
+.ahoy-coverflow-arrow--left {
+  left: 16px;
+}
+
+.ahoy-coverflow-arrow--right {
+  right: 16px;
+}
+
+/* Active Record Info */
+.ahoy-coverflow-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-top: 12px;
+  gap: 4px;
+}
+
+.ahoy-coverflow-info-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ahoy-accent-teal);
+}
+
+.ahoy-coverflow-info-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ahoy-text-main);
+  margin: 0;
+}
+
+.ahoy-coverflow-info-artist {
+  font-size: 14px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.ahoy-coverflow-info-album {
+  color: #d1d5db;
+}
+
+.ahoy-coverflow-center-play-btn {
+  margin-top: 8px;
+  background: linear-gradient(135deg, var(--ahoy-accent-teal), #0f766e);
+  color: #ffffff;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 4px 14px rgba(45, 212, 191, 0.3);
+}
+
+.ahoy-coverflow-center-play-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* High Density Table View */
+.ahoy-table-view-container {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--ahoy-border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ahoy-track-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.ahoy-col-th {
+  padding: 12px 14px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  border-bottom: 1px solid var(--ahoy-border-subtle);
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.ahoy-th-num { width: 44px; text-align: center; }
+.ahoy-th-duration { width: 70px; text-align: right; }
+.ahoy-th-action { width: 60px; text-align: center; }
+
+.ahoy-track-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+
+.ahoy-track-row:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.ahoy-track-row.is-selected {
+  background-color: rgba(45, 212, 191, 0.12);
+}
+
+.ahoy-track-row td {
+  padding: 10px 14px;
+  color: #d1d5db;
+  vertical-align: middle;
+}
+
+.ahoy-td-num {
+  text-align: center;
+  font-family: var(--ahoy-font-mono);
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.ahoy-playing-indicator {
+  color: var(--ahoy-accent-teal);
+  font-weight: 700;
+}
+
+.ahoy-td-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ahoy-table-thumb-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.ahoy-table-track-name {
+  font-weight: 600;
+  color: var(--ahoy-text-main);
+}
+
+.ahoy-td-artist {
+  color: #9ca3af;
+}
+
+.ahoy-td-album {
+  color: #6b7280;
+}
+
+.ahoy-td-duration {
+  font-family: var(--ahoy-font-mono);
+  font-size: 12px;
+  text-align: right;
+  color: #6b7280;
+}
+
+.ahoy-td-action {
+  text-align: center;
+}
+
+.ahoy-table-play-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--ahoy-text-main);
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.ahoy-table-play-btn:hover {
+  background-color: var(--ahoy-accent-teal);
+  color: #0b1719;
+  transform: scale(1.1);
+}
+
