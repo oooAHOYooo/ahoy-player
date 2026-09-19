@@ -1,3 +1,45 @@
+.ahoy-grid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 900px;
+  margin: 0 auto 24px auto;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ahoy-border-subtle);
+  flex-wrap: wrap;
+}
+
+.ahoy-grid-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ahoy-grid-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ahoy-accent-teal);
+  text-transform: uppercase;
+}
+
+.ahoy-grid-heading {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ahoy-text-main);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.ahoy-scan-mp3-btn--prominent {
+  width: auto;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(45, 212, 191, 0.3);
+}
+
 .ahoy-album-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5,6 +47,7 @@
   max-width: 900px;
   margin: 0 auto;
 }
+
 
 @media (max-width: 1050px) {
   .ahoy-album-grid {

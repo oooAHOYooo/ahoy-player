@@ -18,6 +18,8 @@ type ColumnPanelRendererProps = {
   onSelectNav: (id: NavItemId) => void;
   selectedAlbum: AlbumCardData;
   onSelectAlbum: (card: AlbumCardData) => void;
+  onScanMp3s?: () => void;
+  isScanning?: boolean;
   albums?: AlbumCardData[];
   nauticalThemes?: NauticalTheme[];
   activeThemeId?: string;
@@ -36,6 +38,8 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
   onSelectNav,
   selectedAlbum,
   onSelectAlbum,
+  onScanMp3s,
+  isScanning,
   albums,
   nauticalThemes,
   activeThemeId,
@@ -49,7 +53,13 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
 }) => {
   switch (panelId) {
     case "sidebar":
-      return <LeftSidebar activeId={activeNav} onSelect={onSelectNav} />;
+      return (
+        <LeftSidebar
+          activeId={activeNav}
+          onSelect={onSelectNav}
+          onScanMp3s={onScanMp3s}
+        />
+      );
 
     case "grid":
       return (
@@ -57,6 +67,8 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
           albums={albums}
           selectedId={selectedAlbum.id}
           onSelectAlbum={onSelectAlbum}
+          onScanMp3s={onScanMp3s}
+          isScanning={isScanning}
         />
       );
 
@@ -65,7 +77,7 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
         <div className="ahoy-column-embed-drawer">
           <QueueDrawer
             onClose={() => {}}
-            queue={defaultMockAlbums}
+            queue={albums ?? defaultMockAlbums}
             currentTrackId={selectedAlbum.id}
             onSelectTrack={onSelectAlbum}
           />

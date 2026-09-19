@@ -16,6 +16,39 @@
   gap: 20px;
 }
 
+.ahoy-sidebar-action-wrap {
+  padding: 0 2px;
+}
+
+.ahoy-scan-mp3-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--ahoy-accent-teal), #0f766e);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(45, 212, 191, 0.25);
+  transition: all 0.15s ease;
+}
+
+.ahoy-scan-mp3-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(45, 212, 191, 0.4);
+  filter: brightness(1.1);
+}
+
+.ahoy-scan-mp3-btn:active {
+  transform: translateY(0);
+}
+
+
 .ahoy-nav-section {
   display: flex;
   flex-direction: column;

@@ -12,21 +12,36 @@ import {
   ClockIcon,
   StarIcon,
   LogoutIcon,
+  ScanIcon,
 } from "../common/Icons";
 import type { NavItemId } from "../../types/player-ui";
 
 type LeftSidebarProps = {
   activeId: NavItemId;
   onSelect: (id: NavItemId) => void;
+  onScanMp3s?: () => void;
 };
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   activeId,
   onSelect,
+  onScanMp3s,
 }) => {
   return (
     <aside className="ahoy-sidebar" aria-label="Main Navigation">
       <div className="ahoy-sidebar-content">
+        <div className="ahoy-sidebar-action-wrap">
+          <button
+            type="button"
+            className="ahoy-scan-mp3-btn"
+            onClick={onScanMp3s}
+            title="Scan local storage for MP3 tracks"
+          >
+            <ScanIcon size={16} />
+            <span>Scan for MP3s</span>
+          </button>
+        </div>
+
         <NavSection title="Library">
           <NavItem
             id="artists"

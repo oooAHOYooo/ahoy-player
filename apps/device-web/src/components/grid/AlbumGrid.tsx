@@ -1,5 +1,6 @@
 import React from "react";
 import { AlbumCard } from "./AlbumCard";
+import { ScanIcon } from "../common/Icons";
 import type { AlbumCardData } from "../../types/player-ui";
 
 export const defaultMockAlbums: AlbumCardData[] = [
@@ -90,15 +91,35 @@ type AlbumGridProps = {
   albums?: AlbumCardData[];
   selectedId?: string;
   onSelectAlbum: (card: AlbumCardData) => void;
+  onScanMp3s?: () => void;
+  isScanning?: boolean;
 };
 
 export const AlbumGrid: React.FC<AlbumGridProps> = ({
   albums = defaultMockAlbums,
   selectedId,
   onSelectAlbum,
+  onScanMp3s,
+  isScanning = false,
 }) => {
   return (
     <main className="ahoy-center-content">
+      <div className="ahoy-grid-header">
+        <div className="ahoy-grid-title-wrap">
+          <span className="ahoy-grid-eyebrow">YOUR COLLECTION</span>
+          <h2 className="ahoy-grid-heading">Local Music Library</h2>
+        </div>
+        <button
+          type="button"
+          className="ahoy-scan-mp3-btn ahoy-scan-mp3-btn--prominent"
+          onClick={onScanMp3s}
+          title="Scan device for local MP3 audio files"
+        >
+          <ScanIcon size={18} />
+          <span>{isScanning ? "Scanning for MP3s…" : "Scan for MP3s"}</span>
+        </button>
+      </div>
+
       <div className="ahoy-album-grid" role="region" aria-label="Music Collection">
         {albums.map((card) => (
           <AlbumCard

@@ -115,9 +115,21 @@ export function App() {
       playbackAdapter.load({
         id: card.id,
         title: card.title,
-        artist: card.artist,
-        album: card.album,
-        uri: card.audioUrl,
+        artistId: card.artist,
+        artistName: card.artist,
+        albumId: card.album,
+        albumTitle: card.album,
+        importedAt: new Date().toISOString(),
+        source: {
+          kind: "local-file",
+          locator: card.audioUrl,
+          filename: card.title,
+          byteSize: 0,
+          duplicateKey: card.id,
+        },
+        displayMetadata: {
+          policy: "embedded-tag",
+        },
         durationMs: card.durationMs || 180000,
       });
       playbackAdapter.play();
@@ -241,6 +253,8 @@ export function App() {
                     onSelectNav={setActiveNav}
                     selectedAlbum={selectedAlbum}
                     onSelectAlbum={handleSelectAlbum}
+                    onScanMp3s={() => void model.importFiles()}
+                    isScanning={model.isImporting}
                     albums={allAlbums}
                     nauticalThemes={nauticalThemes}
                     activeThemeId={activeThemeId}
