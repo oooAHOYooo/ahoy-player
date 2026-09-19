@@ -1,16 +1,20 @@
 import React from "react";
-import { VolumeIcon, MenuListIcon } from "../common/Icons";
+import { VolumeIcon, MenuListIcon, WaveformIcon, DialIcon } from "../common/Icons";
 
 type VolumeControlProps = {
   volume: number; // 0 to 1
   onChangeVolume: (val: number) => void;
   onToggleQueue?: () => void;
+  onToggleVisualizer?: () => void;
+  onToggleDial?: () => void;
 };
 
 export const VolumeControl: React.FC<VolumeControlProps> = ({
   volume,
   onChangeVolume,
   onToggleQueue,
+  onToggleVisualizer,
+  onToggleDial,
 }) => {
   const percent = Math.round(volume * 100);
 
@@ -37,6 +41,26 @@ export const VolumeControl: React.FC<VolumeControlProps> = ({
           aria-label="Volume slider"
         />
       </div>
+
+      <button
+        type="button"
+        className="ahoy-volume-icon-btn"
+        onClick={onToggleVisualizer}
+        title="Toggle Audio Visualizer"
+        aria-label="Toggle Audio Visualizer"
+      >
+        <WaveformIcon size={16} />
+      </button>
+
+      <button
+        type="button"
+        className="ahoy-volume-icon-btn"
+        onClick={onToggleDial}
+        title="Toggle Rotary Dial Deck"
+        aria-label="Toggle Rotary Dial Deck"
+      >
+        <DialIcon size={16} />
+      </button>
 
       <button
         type="button"

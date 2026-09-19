@@ -19,6 +19,8 @@ const PANEL_LABELS: Record<WorkspacePanelId, string> = {
   sidebar: "Library Navigation",
   grid: "Album Collection",
   queue: "Play Queue",
+  visualizer: "Audio Visualizer",
+  dial: "Rotary Dial Deck",
   "theme-studio": "Theme Studio",
   lyrics: "Synchronized Lyrics",
 };

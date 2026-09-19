@@ -18,6 +18,8 @@ type BottomPlayerBarProps = {
   onSeek: (ms: number) => void;
   onChangeVolume: (vol: number) => void;
   onToggleQueue?: () => void;
+  onToggleVisualizer?: () => void;
+  onToggleDial?: () => void;
   statusText?: string;
   subStatusText?: string;
 };
@@ -34,6 +36,8 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
   onSeek,
   onChangeVolume,
   onToggleQueue,
+  onToggleVisualizer,
+  onToggleDial,
   statusText,
   subStatusText,
 }) => {
@@ -67,6 +71,8 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
             volume={volume}
             onChangeVolume={onChangeVolume}
             onToggleQueue={onToggleQueue}
+            onToggleVisualizer={onToggleVisualizer}
+            onToggleDial={onToggleDial}
           />
         </div>
       </section>

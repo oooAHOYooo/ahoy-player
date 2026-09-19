@@ -207,4 +207,22 @@ export const ScanIcon: React.FC<IconProps> = ({ className, size = 18, color = "c
   </svg>
 );
 
+export const WaveformIcon: React.FC<IconProps> = ({ className, size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 12h2l2-7 4 14 3-10 2 6 2-3h4" />
+  </svg>
+);
+
+export const DialIcon: React.FC<IconProps> = ({ className, size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 3v3" />
+    <path d="M12 18v3" />
+    <path d="M3 12h3" />
+    <path d="M18 12h3" />
+  </svg>
+);
+
+
 

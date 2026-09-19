@@ -8,6 +8,9 @@ import "./styles/sidebar.css";
 import "./styles/album-grid.css";
 import "./styles/dock-drawer.css";
 import "./styles/player-bar.css";
+import "./styles/visualizer.css";
+import "./styles/dial-panel.css";
+import "@ahoy/player-ui-dial/styles.css";
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   void navigator.serviceWorker.register("/sw.js");

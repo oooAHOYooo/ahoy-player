@@ -4,6 +4,8 @@ import { AlbumGrid, defaultMockAlbums } from "../grid/AlbumGrid";
 import { QueueDrawer } from "../drawer/QueueDrawer";
 import { ThemeStudio } from "../drawer/ThemeStudio/ThemeStudio";
 import { LyricsDrawer } from "../drawer/LyricsDrawer";
+import { AudioVisualizerPanel } from "../visualizer/AudioVisualizerPanel";
+import { AhoyDialPanel } from "../dial/AhoyDialPanel";
 import type {
   WorkspacePanelId,
   NavItemId,
@@ -30,6 +32,14 @@ type ColumnPanelRendererProps = {
   onToggleAdvanced: (val: boolean) => void;
   cssCode: string;
   onChangeCss: (val: string) => void;
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
+  onNextTrack?: () => void;
+  onPreviousTrack?: () => void;
+  onSeek?: (ratio: number) => void;
+  positionMs?: number;
+  durationMs?: number;
+  volume?: number;
 };
 
 export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
@@ -50,6 +60,14 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
   onToggleAdvanced,
   cssCode,
   onChangeCss,
+  isPlaying = false,
+  onTogglePlay = () => {},
+  onNextTrack = () => {},
+  onPreviousTrack = () => {},
+  onSeek = () => {},
+  positionMs = 0,
+  durationMs = 180000,
+  volume = 0.8,
 }) => {
   switch (panelId) {
     case "sidebar":
@@ -80,6 +98,33 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
             queue={albums ?? defaultMockAlbums}
             currentTrackId={selectedAlbum.id}
             onSelectTrack={onSelectAlbum}
+          />
+        </div>
+      );
+
+    case "visualizer":
+      return (
+        <div className="ahoy-column-embed-drawer">
+          <AudioVisualizerPanel
+            isPlaying={isPlaying}
+            nowPlaying={selectedAlbum}
+            volume={volume}
+          />
+        </div>
+      );
+
+    case "dial":
+      return (
+        <div className="ahoy-column-embed-drawer">
+          <AhoyDialPanel
+            isPlaying={isPlaying}
+            onTogglePlay={onTogglePlay}
+            onNextTrack={onNextTrack}
+            onPreviousTrack={onPreviousTrack}
+            onSeek={onSeek}
+            positionMs={positionMs}
+            durationMs={durationMs}
+            nowPlaying={selectedAlbum}
           />
         </div>
       );

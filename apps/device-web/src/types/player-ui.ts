@@ -30,7 +30,13 @@ export type AlbumCardData = {
   durationMs?: number;
 };
 
-export type DockTabId = "queue" | "lyrics" | "theme-studio" | "settings";
+export type DockTabId =
+  | "queue"
+  | "lyrics"
+  | "visualizer"
+  | "dial"
+  | "theme-studio"
+  | "settings";
 
 export type NavItemId =
   | "artists"
@@ -49,6 +55,8 @@ export type WorkspacePanelId =
   | "sidebar"
   | "grid"
   | "queue"
+  | "visualizer"
+  | "dial"
   | "theme-studio"
   | "lyrics";
 

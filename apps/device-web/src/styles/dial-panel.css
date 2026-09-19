@@ -1,0 +1,140 @@
+.ahoy-dial-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--ahoy-bg-sidebar);
+  color: var(--ahoy-text-main);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  gap: 16px;
+}
+
+.ahoy-dial-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-bottom: 1px solid var(--ahoy-border-subtle);
+  padding-bottom: 12px;
+}
+
+.ahoy-dial-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ahoy-dial-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ahoy-accent-teal);
+  text-transform: uppercase;
+}
+
+.ahoy-dial-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ahoy-text-main);
+  margin: 0;
+}
+
+.ahoy-dial-mode-group {
+  display: flex;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.ahoy-dial-mode-btn {
+  padding: 5px 9px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  border: none;
+}
+
+.ahoy-dial-mode-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ahoy-dial-mode-btn.is-active {
+  background: var(--ahoy-accent-teal);
+  color: #0b1719;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(45, 212, 191, 0.3);
+}
+
+.ahoy-dial-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  background: radial-gradient(circle at center, #19272d 0%, #0d161a 100%);
+  border: 1px solid var(--ahoy-border-subtle);
+  border-radius: 12px;
+  padding: 24px 16px;
+  position: relative;
+  box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.5);
+}
+
+.ahoy-dial-signal-wrap {
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(45, 212, 191, 0.3);
+}
+
+.ahoy-dial-action-feedback {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 3px 10px;
+  border-radius: 12px;
+  color: var(--ahoy-accent-teal);
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  white-space: nowrap;
+}
+
+.ahoy-dial-track-info {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ahoy-dial-track-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ahoy-text-main);
+}
+
+.ahoy-dial-track-artist {
+  font-size: 11.5px;
+  color: #9ca3af;
+}
+
+.ahoy-dial-guidance {
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1.5;
+  padding: 0 4px;
+}

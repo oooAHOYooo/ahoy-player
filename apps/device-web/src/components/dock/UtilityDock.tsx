@@ -5,6 +5,8 @@ import {
   LyricsIcon,
   ThemeStudioIcon,
   SettingsIcon,
+  WaveformIcon,
+  DialIcon,
 } from "../common/Icons";
 import type { DockTabId } from "../../types/player-ui";
 
@@ -26,6 +28,20 @@ export const UtilityDock: React.FC<UtilityDockProps> = ({
           icon={<QueueIcon size={18} />}
           active={activeTab === "queue"}
           onClick={() => onSelectTab("queue")}
+        />
+        <DockItem
+          id="visualizer"
+          label="Audio Visualizer"
+          icon={<WaveformIcon size={18} />}
+          active={activeTab === "visualizer"}
+          onClick={() => onSelectTab("visualizer")}
+        />
+        <DockItem
+          id="dial"
+          label="Rotary Dial Deck"
+          icon={<DialIcon size={18} />}
+          active={activeTab === "dial"}
+          onClick={() => onSelectTab("dial")}
         />
         <DockItem
           id="lyrics"

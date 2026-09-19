@@ -15,6 +15,7 @@ import { BottomPlayerBar } from "./components/player/BottomPlayerBar";
 import { defaultMockAlbums } from "./components/grid/AlbumGrid";
 import { useThemeStudio } from "./hooks/useThemeStudio";
 import { useWorkspaceColumns } from "./hooks/useWorkspaceColumns";
+import { useAhoyInput } from "@ahoy/player-ui-dial";
 import type { NavItemId, AlbumCardData, DockTabId } from "./types/player-ui";
 
 const fileImport = new BrowserFileImportAdapter();
@@ -165,10 +166,42 @@ export function App() {
     handleSelectAlbum(defaultMockAlbums[nextIndex]);
   };
 
+  // Connect tactile Hardware Dial / Keyboard / Gamepad input bus
+  useAhoyInput((action) => {
+    switch (action.type) {
+      case "play":
+      case "select":
+        handleTogglePlay();
+        break;
+      case "next":
+        handleNext();
+        break;
+      case "back":
+        handlePrevious();
+        break;
+      case "turn":
+        setPositionMs((prev) => {
+          const delta = action.direction * 5000;
+          return Math.max(0, Math.min(activeDurationMs, prev + delta));
+        });
+        break;
+      case "menu":
+        // Toggle the third column to visualizer or dial
+        setColumnPanel(2, columns[2] === "visualizer" ? "dial" : "visualizer");
+        break;
+    }
+  });
+
   // When clicking a tab on the dock, update the third column to that panel
   const handleSelectDockTab = (tab: DockTabId) => {
     setActiveTab(tab);
-    if (tab === "queue" || tab === "theme-studio" || tab === "lyrics") {
+    if (
+      tab === "queue" ||
+      tab === "theme-studio" ||
+      tab === "lyrics" ||
+      tab === "visualizer" ||
+      tab === "dial"
+    ) {
       setColumnPanel(2, tab);
     }
   };
@@ -265,6 +298,14 @@ export function App() {
                     onToggleAdvanced={setIsAdvanced}
                     cssCode={customCss}
                     onChangeCss={setCustomCss}
+                    isPlaying={activeIsPlaying}
+                    onTogglePlay={handleTogglePlay}
+                    onNextTrack={handleNext}
+                    onPreviousTrack={handlePrevious}
+                    onSeek={(ratio) => setPositionMs(Math.round(ratio * activeDurationMs))}
+                    positionMs={activePositionMs}
+                    durationMs={activeDurationMs}
+                    volume={currentVolume}
                   />
                 </div>
               </section>
@@ -274,7 +315,19 @@ export function App() {
 
         {/* Right Utility Dock */}
         <UtilityDock
-          activeTab={columns[2] === "queue" ? "queue" : columns[2] === "theme-studio" ? "theme-studio" : columns[2] === "lyrics" ? "lyrics" : activeTab}
+          activeTab={
+            columns[2] === "queue"
+              ? "queue"
+              : columns[2] === "theme-studio"
+              ? "theme-studio"
+              : columns[2] === "lyrics"
+              ? "lyrics"
+              : columns[2] === "visualizer"
+              ? "visualizer"
+              : columns[2] === "dial"
+              ? "dial"
+              : activeTab
+          }
           onSelectTab={handleSelectDockTab}
         />
       </div>
@@ -292,6 +345,8 @@ export function App() {
         onSeek={setPositionMs}
         onChangeVolume={(vol) => model.setVolume(vol)}
         onToggleQueue={() => setColumnPanel(2, "queue")}
+        onToggleVisualizer={() => setColumnPanel(2, "visualizer")}
+        onToggleDial={() => setColumnPanel(2, "dial")}
         statusText="READY."
         subStatusText="QUEUE NATIVE RUST STATE. LOCAL FILES NEVER UPLOADED."
       />
