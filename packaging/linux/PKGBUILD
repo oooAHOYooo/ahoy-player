@@ -3,6 +3,7 @@ pkgver=0.2.0
 pkgrel=1
 pkgdesc='Local-first music player with native GUI and terminal companion'
 arch=('x86_64')
+install=ahoy-player.install
 url='https://github.com/oooAHOYooo/ahoy-player'
 license=('MIT')
 depends=('alsa-lib' 'fontconfig' 'glibc' 'libxkbcommon' 'nodejs' 'wayland')

@@ -38,7 +38,8 @@ One Linux installation supplies both commands:
 
 ```bash
 ahoy-player # graphical player
-ahoy --help # terminal CLI/TUI
+ahoy player  # terminal player / TUI
+ahoy --help  # terminal CLI/TUI help
 ```
 
 Both products use `~/.local/share/ahoy-player/library.json` (or `$XDG_DATA_HOME/ahoy-player`). The terminal companion automatically migrates its former `~/.ahoy-player/library.json` on first use; the old file is retained. The shared JSON is compatible with the native player, although terminal scans currently use filename/folder metadata rather than reading ID3 tags.
@@ -52,7 +53,7 @@ An AppImage is not produced or advertised as installing `ahoy` globally. It need
 ```bash
 npm install
 npm run ahoy -- scan ~/Music
-npm run ahoy -- tui
+npm run ahoy -- player
 ```
 
 The native desktop application does not use Electron, Tauri, Chromium, WebView, React, HTML, or CSS. `apps/device-web` is retained only as an optional browser experiment and is not part of the macOS/Linux desktop product.

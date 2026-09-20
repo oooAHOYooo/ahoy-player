@@ -13,6 +13,7 @@ const legacyAppHome = join(homedir(), ".ahoy-player");
 const bundledDemoPath = join(dirname(new URL(import.meta.url).pathname), "assets", "ahoy-demo.mp3");
 const demoDirectory = join(appHome, "demo");
 const libraryPath = join(appHome, "library.json");
+const playbackLockPath = join(appHome, "playback.lock");
 const useColor = Boolean(process.stdout.isTTY && !process.env.NO_COLOR);
 const tint = (code, value) => useColor ? `\x1b[${code}m${value}\x1b[0m` : value;
 const accent = (value) => tint("38;5;156", value);
@@ -134,6 +135,15 @@ export async function scanDirectories(directories) {
   return { added, updated, total: library.tracks.length };
 }
 
+export async function rescanLibrary(directories = []) {
+  const library = await loadLibrary();
+  const roots = directories.length
+    ? directories
+    : [...new Set(library.tracks.map((track) => dirname(track.path)))];
+  if (!roots.length) return { added: 0, updated: 0, total: 0 };
+  return scanDirectories(roots);
+}
+
 export async function installDemo(destinationDirectory = demoDirectory) {
   await mkdir(destinationDirectory, { recursive: true });
   const destination = join(destinationDirectory, "Ahoy - Demo.mp3");
@@ -164,8 +174,32 @@ function selectTrack(tracks, selector) {
 export async function playTrack(track) {
   const player = playerCommand();
   if (!player) throw new Error("Install mpv, VLC (cvlc), or FFmpeg (ffplay) to play audio on Linux.");
+  await stopPreviousPlayback();
   console.log(`${accent("▶")} ${track.title} ${dim(`— ${track.artist}`)}`);
-  return spawn(player.command, [...player.baseArgs, track.path], { stdio: "inherit" });
+  const child = spawn(player.command, [...player.baseArgs, track.path], { stdio: "inherit" });
+  await writeFile(playbackLockPath, `${child.pid}\n`, "utf8");
+  child.once("exit", () => { void releasePlaybackLock(child.pid); });
+  return child;
+}
+
+async function stopPreviousPlayback() {
+  try {
+    const pid = Number.parseInt(await readFile(playbackLockPath, "utf8"), 10);
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return;
+    try { process.kill(pid, "SIGTERM"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
+
+async function releasePlaybackLock(childPid) {
+  try {
+    const pid = Number.parseInt(await readFile(playbackLockPath, "utf8"), 10);
+    if (pid === childPid) await writeFile(playbackLockPath, "", "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
 }
 
 export function buildToneWav(frequency) {
@@ -273,7 +307,8 @@ async function tui() {
 }
 
 function help() {
-  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy scan <folder...>      add MP3s from local folders\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n\nmacOS uses the built-in afplay. Linux uses mpv, VLC (cvlc), or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
+  console.log("  ahoy rescan [folder...]     refresh the saved library from its folders");
+  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy player                open the terminal player (same as ahoy tui)\n  ahoy scan <folder...>      add MP3s from local folders\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n\nmacOS uses the built-in afplay. Linux uses mpv, VLC (cvlc), or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
 }
 
 export async function main(args = process.argv.slice(2)) {
@@ -283,6 +318,11 @@ export async function main(args = process.argv.slice(2)) {
     if (!rest.length) throw new Error("Choose at least one folder, for example: ahoy scan ~/Music");
     const result = await scanDirectories(rest);
     console.log(`${accent("Library updated")} · ${result.added} added, ${result.updated} refreshed, ${result.total} total`);
+    return;
+  }
+  if (command === "rescan") {
+    const result = await rescanLibrary(rest);
+    console.log(`${accent("Library rescanned")} · ${result.added} added, ${result.updated} refreshed, ${result.total} total`);
     return;
   }
   if (command === "demo") {
@@ -301,7 +341,7 @@ export async function main(args = process.argv.slice(2)) {
     await playTrack(track);
     return;
   }
-  if (command === "tui") return tui();
+  if (command === "player" || command === "tui") return tui();
   throw new Error(`Unknown command: ${command}. Run \`ahoy help\`.`);
 }
 

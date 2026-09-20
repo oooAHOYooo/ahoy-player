@@ -51,3 +51,24 @@ test("scan writes the native player library schema", async () => {
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("rescan refreshes folders already present in the saved library", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ahoy-terminal-rescan-test-"));
+  const dataDirectory = join(directory, "data");
+  try {
+    await writeFile(join(directory, "first.mp3"), "first");
+    await execFileAsync(process.execPath, ["../ahoy.mjs", "scan", directory], {
+      cwd: new URL(".", import.meta.url),
+      env: { ...process.env, AHOY_PLAYER_HOME: dataDirectory }
+    });
+    await writeFile(join(directory, "second.mp3"), "second");
+    await execFileAsync(process.execPath, ["../ahoy.mjs", "rescan"], {
+      cwd: new URL(".", import.meta.url),
+      env: { ...process.env, AHOY_PLAYER_HOME: dataDirectory }
+    });
+    const library = JSON.parse(await readFile(join(dataDirectory, "library.json"), "utf8"));
+    assert.equal(library.tracks.length, 2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

@@ -107,3 +107,31 @@ body { background: linear-gradient(135deg, #f6f8f5 0%, #e8eee7 48%, #f5f6f1 100%
 .player-deck:has(+ .synth-keyboard.is-active) { box-shadow: 0 1rem 3rem rgba(61,82,65,.16), 0 0 2rem rgba(183,241,86,.16), inset 0 1px rgba(255,255,255,.88); }
 @media (max-width: 850px) { .synth-keyboard { right: 1rem; left: 1rem; } }
 @media (max-width: 620px) { .synth-keyboard { right: .55rem; bottom: 6.8rem; left: .55rem; padding: .7rem; } .synth-keyboard__top { align-items: start; } .synth-toggle { padding: .48rem .55rem; font-size: .48rem; } .synth-keyboard__keys { gap: .18rem; } .synth-keyboard__keys button { min-height: 2.35rem; } .synth-controls { gap: .5rem; } .synth-keyboard__hint { font-size: .42rem; } }
+
+.keyboard-help-button { display: inline-flex; align-items: center; gap: .35rem; border: 1px solid rgba(82,101,86,.18); border-radius: .35rem; padding: .3rem .45rem; background: rgba(255,255,255,.3); color: #69766c; font-size: .52rem; }
+.keyboard-help-button:hover { background: rgba(var(--user-accent-rgb),.1); color: var(--user-accent); }
+.keyboard-help-button kbd, .keyboard-help kbd { border: 1px solid rgba(82,101,86,.25); border-radius: .25rem; padding: .15rem .3rem; background: rgba(255,255,255,.5); color: #526055; font: 700 .48rem 'DM Mono', monospace; }
+.keyboard-help-backdrop { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 1rem; background: linear-gradient(135deg, rgba(20,12,38,.5), rgba(255,52,133,.16), rgba(0,209,255,.2)); backdrop-filter: blur(10px); animation: help-hue 8s ease-in-out infinite alternate; }
+.keyboard-help { width: min(31rem, 100%); padding: 1.1rem; border: 1px solid rgba(255,255,255,.45); border-radius: .85rem; background: linear-gradient(145deg, rgba(255,255,255,.9), rgba(231,244,255,.84)); box-shadow: 0 1.2rem 4rem rgba(29,20,72,.32), 0 0 3rem rgba(255,73,170,.22); color: #263129; }
+.keyboard-help header { display: flex; justify-content: space-between; gap: 1rem; align-items: start; }.keyboard-help h2 { margin: .2rem 0 .35rem; font-size: 1.1rem; letter-spacing: -.04em; }.keyboard-help p:not(.eyebrow) { margin: 0; color: #718073; font-size: .58rem; }.keyboard-help-close { border: 0; border-radius: .35rem; padding: .15rem .45rem; background: transparent; color: #718073; font-size: 1.2rem; }.keyboard-help-close:hover { background: rgba(var(--user-accent-rgb),.1); color: var(--user-accent); }
+.keyboard-help-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; margin: 1rem 0; }.keyboard-help-grid div { display: flex; gap: .55rem; align-items: center; padding: .55rem; border: 1px solid rgba(82,101,86,.13); border-radius: .45rem; background: rgba(237,243,236,.65); }.keyboard-help-grid span { color: #526055; font-size: .57rem; }.keyboard-help-grid kbd { min-width: 2.2rem; text-align: center; }
+.keyboard-help footer { display: flex; justify-content: space-between; align-items: center; padding-top: .7rem; border-top: 1px solid rgba(82,101,86,.14); color: #829083; font: .48rem 'DM Mono', monospace; }.keyboard-help footer button { border: 0; border-radius: .35rem; padding: .45rem .7rem; background: var(--user-accent); color: #fff; font-size: .56rem; }
+.theme-dark .keyboard-help { border-color: rgba(255,155,188,.22); background: rgba(48,19,32,.95); color: #f9e8ef; }.theme-dark .keyboard-help p:not(.eyebrow), .theme-dark .keyboard-help footer { color: #b993a2; }.theme-dark .keyboard-help-grid div { border-color: rgba(255,255,255,.1); background: rgba(255,255,255,.06); }.theme-dark .keyboard-help-grid span { color: #f1dce5; }.theme-dark .keyboard-help kbd { border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.1); color: #f1dce5; }
+@media (max-width: 620px) { .keyboard-help-button { padding: .3rem; }.keyboard-help-button:not(:focus-visible) { font-size: 0; }.keyboard-help-button kbd { font-size: .48rem; }.keyboard-help-grid { grid-template-columns: 1fr; } }
+
+@keyframes help-hue { from { filter: hue-rotate(-12deg); } to { filter: hue-rotate(28deg); } }
+.keyboard-help-grid div { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.keyboard-help-grid div:hover { transform: translateY(-2px) rotate(-.5deg); border-color: rgba(255,76,166,.45); box-shadow: 0 .45rem 1.2rem rgba(86,104,255,.16); }
+.synth-keyboard.is-active { border-color: rgba(255,76,166,.62); background: linear-gradient(120deg, rgba(12,20,30,.97), rgba(35,17,58,.96) 45%, rgba(9,52,62,.96)); box-shadow: 0 0 1.2rem rgba(255,76,166,.28), 0 0 3rem rgba(0,218,255,.14), inset 0 1px rgba(255,255,255,.18); }
+.synth-keyboard.is-active .synth-keyboard__top strong { color: #fff1fb; text-shadow: 0 0 .8rem rgba(255,76,166,.72); }
+.synth-keyboard.is-active .synth-keyboard__top span, .synth-keyboard.is-active .synth-keyboard__hint { color: #bcefff; }
+.synth-keyboard.is-active .piano-keys button { border-color: rgba(115,224,255,.4); background: linear-gradient(155deg, rgba(255,255,255,.94), rgba(190,240,255,.8)); box-shadow: inset 0 -.3rem rgba(73,113,255,.12); }
+.synth-keyboard.is-active .piano-keys button:nth-child(3n) { background: linear-gradient(155deg, #fff5a8, #ffb4dd); }
+.synth-keyboard.is-active .piano-keys button:nth-child(3n+1) { background: linear-gradient(155deg, #b9fff0, #a9c9ff); }
+.synth-keyboard.is-active .piano-keys button:nth-child(3n+2) { background: linear-gradient(155deg, #ffd0f1, #cbb7ff); }
+.synth-keyboard.is-active .piano-keys button.is-held { transform: translateY(3px) scale(.97); border-color: #fff; box-shadow: 0 0 .9rem rgba(255,94,190,.92), 0 0 1.5rem rgba(79,218,255,.6), inset 0 -.2rem rgba(255,255,255,.4); filter: saturate(1.45); }
+.synth-keyboard.is-active .synth-controls input { accent-color: #ff63b8; }
+.energy-control { color: #ffb7de; }
+.energy-control b { margin-left: .3rem; color: #7eeeff; font: .48rem 'DM Mono', monospace; }
+.volume-max { border: 1px solid rgba(255,91,137,.36) !important; border-radius: .3rem; padding: .22rem .3rem; color: #e25c78 !important; font: 700 .43rem 'DM Mono', monospace; }
+.volume-max:hover { background: rgba(255,91,137,.12) !important; color: #be244e !important; }

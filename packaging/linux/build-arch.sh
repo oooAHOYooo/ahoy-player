@@ -9,6 +9,7 @@ archive="$work/ahoy-player-$version.tar.gz"
 
 git -C "$root" archive --format=tar --prefix="ahoy-player-$version/" HEAD | gzip > "$archive"
 cp "$root/packaging/linux/PKGBUILD" "$work/PKGBUILD"
+cp "$root/packaging/linux/ahoy-player.install" "$work/ahoy-player.install"
 sed -i "s/^pkgver=.*/pkgver=$version/" "$work/PKGBUILD"
 (
   cd "$work"
