@@ -4,14 +4,30 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
-import { buildToneWav, labelsForPath } from "../ahoy.mjs";
+import { buildToneWav, labelsForPath, main } from "../ahoy.mjs";
 
 const execFileAsync = promisify(execFile);
+const testDirectory = fileURLToPath(new URL(".", import.meta.url));
+const cliPath = fileURLToPath(new URL("../ahoy.mjs", import.meta.url));
 
 test("ships a bundled demo MP3 for first-run testing", () => {
   assert.equal(existsSync(new URL("../assets/ahoy-demo.mp3", import.meta.url)), true);
+});
+
+test("reports the package version through the public CLI command", async () => {
+  const output = [];
+  const log = console.log;
+  console.log = (value) => output.push(value);
+  try {
+    await main(["--version"]);
+  } finally {
+    console.log = log;
+  }
+  const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.deepEqual(output, [manifest.version]);
 });
 
 test("derives readable labels from conventional MP3 filenames", () => {
@@ -38,8 +54,8 @@ test("scan writes the native player library schema", async () => {
   const directory = await mkdtemp(join(tmpdir(), "ahoy-terminal-test-"));
   try {
     await writeFile(join(directory, "song.mp3"), "not audio, but enough to index");
-    await execFileAsync(process.execPath, ["../ahoy.mjs", "scan", directory], {
-      cwd: new URL(".", import.meta.url),
+    await execFileAsync(process.execPath, [cliPath, "scan", directory], {
+      cwd: testDirectory,
       env: { ...process.env, AHOY_PLAYER_HOME: join(directory, "data") }
     });
     const library = JSON.parse(await readFile(join(directory, "data", "library.json"), "utf8"));
@@ -57,13 +73,13 @@ test("rescan refreshes folders already present in the saved library", async () =
   const dataDirectory = join(directory, "data");
   try {
     await writeFile(join(directory, "first.mp3"), "first");
-    await execFileAsync(process.execPath, ["../ahoy.mjs", "scan", directory], {
-      cwd: new URL(".", import.meta.url),
+    await execFileAsync(process.execPath, [cliPath, "scan", directory], {
+      cwd: testDirectory,
       env: { ...process.env, AHOY_PLAYER_HOME: dataDirectory }
     });
     await writeFile(join(directory, "second.mp3"), "second");
-    await execFileAsync(process.execPath, ["../ahoy.mjs", "rescan"], {
-      cwd: new URL(".", import.meta.url),
+    await execFileAsync(process.execPath, [cliPath, "rescan"], {
+      cwd: testDirectory,
       env: { ...process.env, AHOY_PLAYER_HOME: dataDirectory }
     });
     const library = JSON.parse(await readFile(join(dataDirectory, "library.json"), "utf8"));

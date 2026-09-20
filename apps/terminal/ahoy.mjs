@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir, platform, tmpdir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 
 // This is deliberately the same path and JSON shape used by the native player.
 // AHOY_PLAYER_HOME remains useful for tests and portable installs.
 const appHome = process.env.AHOY_PLAYER_HOME || join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "ahoy-player");
 const legacyAppHome = join(homedir(), ".ahoy-player");
-const bundledDemoPath = join(dirname(new URL(import.meta.url).pathname), "assets", "ahoy-demo.mp3");
+const modulePath = fileURLToPath(import.meta.url);
+const moduleDirectory = dirname(modulePath);
+const bundledDemoPath = join(moduleDirectory, "assets", "ahoy-demo.mp3");
+const packagePath = join(moduleDirectory, "package.json");
 const demoDirectory = join(appHome, "demo");
 const libraryPath = join(appHome, "library.json");
 const playbackLockPath = join(appHome, "playback.lock");
@@ -233,6 +237,19 @@ async function playRemixNote(index) {
   spawn(player.command, [...player.baseArgs, tonePath], { stdio: "ignore" });
 }
 
+async function packageVersion() {
+  const manifest = JSON.parse(await readFile(packagePath, "utf8"));
+  return manifest.version;
+}
+
+async function update() {
+  const npm = platform() === "win32" ? "npm.cmd" : "npm";
+  const result = spawnSync(npm, ["install", "--global", "@ahoy/player-terminal@latest"], { stdio: "inherit" });
+  if (result.error) throw new Error(`Could not run npm: ${result.error.message}`);
+  if (result.status !== 0) throw new Error("Update failed. Check that npm is installed and that you can install global packages.");
+  console.log(`${accent("Ahoy Player updated")} · run \`ahoy --version\` to confirm the installed version.`);
+}
+
 function clearScreen() { process.stdout.write("\x1b[2J\x1b[H"); }
 function crop(value, width) { return value.length > width ? `${value.slice(0, Math.max(1, width - 1))}…` : value; }
 function waveform(tick, active, width) {
@@ -308,12 +325,14 @@ async function tui() {
 
 function help() {
   console.log("  ahoy rescan [folder...]     refresh the saved library from its folders");
-  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy player                open the terminal player (same as ahoy tui)\n  ahoy scan <folder...>      add MP3s from local folders\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n\nmacOS uses the built-in afplay. Linux uses mpv, VLC (cvlc), or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
+  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy player                open the terminal player (same as ahoy tui)\n  ahoy scan <folder...>      add MP3s from local folders\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n  ahoy update                install the latest published terminal player\n\nmacOS uses the built-in afplay. Linux uses mpv, VLC (cvlc), or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
 }
 
 export async function main(args = process.argv.slice(2)) {
   const [command = "help", ...rest] = args;
   if (["help", "--help", "-h"].includes(command)) return help();
+  if (["--version", "-v", "version"].includes(command)) return console.log(await packageVersion());
+  if (command === "update") return update();
   if (command === "scan") {
     if (!rest.length) throw new Error("Choose at least one folder, for example: ahoy scan ~/Music");
     const result = await scanDirectories(rest);
@@ -345,6 +364,6 @@ export async function main(args = process.argv.slice(2)) {
   throw new Error(`Unknown command: ${command}. Run \`ahoy help\`.`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === modulePath) {
   main().catch((error) => { console.error(`ahoy: ${error.message}`); process.exitCode = 1; });
 }

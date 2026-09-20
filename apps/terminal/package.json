@@ -1,7 +1,31 @@
 {
   "name": "@ahoy/player-terminal",
-  "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "description": "Ahoy Player's local-first terminal music player and TUI.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oooAHOYooo/ahoy-player.git",
+    "directory": "apps/terminal"
+  },
+  "homepage": "https://github.com/oooAHOYooo/ahoy-player#readme",
+  "bugs": "https://github.com/oooAHOYooo/ahoy-player/issues",
+  "keywords": [
+    "music-player",
+    "terminal",
+    "tui",
+    "cli"
+  ],
+  "files": [
+    "ahoy.mjs",
+    "assets/ahoy-demo.mp3"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "ahoy": "./ahoy.mjs"
