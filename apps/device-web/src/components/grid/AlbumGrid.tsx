@@ -1,9 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { AlbumCard } from "./AlbumCard";
 import { CoverFlowView } from "./CoverFlowView";
 import { TableView } from "./TableView";
-import { ScanIcon, CoverFlowIcon, GridIcon, ListTableIcon } from "../common/Icons";
-import type { AlbumCardData } from "../../types/player-ui";
+import {
+  ScanIcon,
+  CoverFlowIcon,
+  GridIcon,
+  ListTableIcon,
+  SearchIcon,
+  StarIcon,
+  LogoutIcon,
+} from "../common/Icons";
+import type { AlbumCardData, NavItemId } from "../../types/player-ui";
 
 export type CollectionViewMode = "coverflow" | "grid" | "table";
 export type GridDensity = "compact" | "standard" | "large";
@@ -98,6 +106,10 @@ type AlbumGridProps = {
   onSelectAlbum: (card: AlbumCardData) => void;
   onScanMp3s?: () => void;
   isScanning?: boolean;
+  activeNav?: NavItemId;
+  playlistName?: string;
+  isFavorite?: (trackId: string) => boolean;
+  onToggleFavorite?: (trackId: string) => void;
 };
 
 export const AlbumGrid: React.FC<AlbumGridProps> = ({
@@ -106,6 +118,10 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   onSelectAlbum,
   onScanMp3s,
   isScanning = false,
+  activeNav = "artists",
+  playlistName,
+  isFavorite,
+  onToggleFavorite,
 }) => {
   const [viewMode, setViewMode] = useState<CollectionViewMode>(() => {
     if (typeof window !== "undefined") {
@@ -127,6 +143,37 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
     return "standard";
   });
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedArtistFilter, setSelectedArtistFilter] = useState("all");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto switch to cover flow when clicking 'albums-box'
+  useEffect(() => {
+    if (activeNav === "albums-box") {
+      setViewMode("coverflow");
+    }
+  }, [activeNav]);
+
+  // Global hotkey '/' to focus search, and 'Escape' to clear
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        e.key === "/" &&
+        target.tagName !== "INPUT" &&
+        target.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === "Escape" && document.activeElement === searchInputRef.current) {
+        setSearchQuery("");
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const handleSetViewMode = (mode: CollectionViewMode) => {
     setViewMode(mode);
     if (typeof window !== "undefined") {
@@ -141,17 +188,175 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
     }
   };
 
+  // Distinct artists list for pill filter
+  const uniqueArtists = useMemo(() => {
+    const set = new Set<string>();
+    albums.forEach((a) => {
+      // Clean artist names (e.g. "MGMT / Remix" -> split or whole)
+      set.add(a.artist.split(" / ")[0].trim());
+    });
+    return Array.from(set);
+  }, [albums]);
+
+  // Filtered tracks based on search query & artist pills
+  const filteredAlbums = useMemo(() => {
+    return albums.filter((card) => {
+      // 1. Search query match
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesTitle = card.title.toLowerCase().includes(q);
+        const matchesArtist = card.artist.toLowerCase().includes(q);
+        const matchesAlbum = card.album.toLowerCase().includes(q);
+        if (!matchesTitle && !matchesArtist && !matchesAlbum) {
+          return false;
+        }
+      }
+
+      // 2. Artist pill filter (active when viewing artists)
+      if (activeNav === "artists" && selectedArtistFilter !== "all") {
+        if (!card.artist.toLowerCase().includes(selectedArtistFilter.toLowerCase())) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [albums, searchQuery, activeNav, selectedArtistFilter]);
+
+  // Compute context title & eyebrow
+  const getHeaderContext = () => {
+    if (activeNav === "artists") {
+      return {
+        eyebrow: "ARTISTS & DISCOGRAPHIES",
+        heading: "Artist Discographies",
+        subtitle: `${filteredAlbums.length} tracks across ${uniqueArtists.length} artists`,
+      };
+    }
+    if (activeNav === "albums-disc") {
+      return {
+        eyebrow: "ALBUMS",
+        heading: "All Albums & Records",
+        subtitle: `${filteredAlbums.length} tracks`,
+      };
+    }
+    if (activeNav === "albums-box") {
+      return {
+        eyebrow: "VINYL CRATE",
+        heading: "3D Cover Flow Crate",
+        subtitle: `Browsing ${filteredAlbums.length} albums in tactile 3D space`,
+      };
+    }
+    if (activeNav === "recently-added-clock") {
+      return {
+        eyebrow: "HISTORY",
+        heading: "Recently Added",
+        subtitle: "Tracks sorted by most recent import timestamp",
+      };
+    }
+    if (activeNav === "recently-added-star") {
+      return {
+        eyebrow: "FAVORITES",
+        heading: "★ Starred Favorites",
+        subtitle: `${filteredAlbums.length} starred tracks saved to sovereign storage`,
+      };
+    }
+    if (activeNav === "logout") {
+      return {
+        eyebrow: "SOVEREIGN DATA",
+        heading: "Local Sovereign Storage",
+        subtitle: "Zero cloud tracking • Web Audio Buffers • 100% Offline",
+      };
+    }
+    if (playlistName) {
+      return {
+        eyebrow: "PLAYLIST",
+        heading: playlistName,
+        subtitle: `${filteredAlbums.length} tracks in playlist`,
+      };
+    }
+    return {
+      eyebrow: "YOUR COLLECTION",
+      heading: "Local Music Library",
+      subtitle: `${filteredAlbums.length} tracks loaded`,
+    };
+  };
+
+  const headerInfo = getHeaderContext();
+
   return (
     <main className="ahoy-center-content">
+      {/* Live Search Bar */}
+      <div className="ahoy-grid-search-container">
+        <div className="ahoy-grid-search-wrap">
+          <span className="ahoy-grid-search-icon">
+            <SearchIcon size={16} />
+          </span>
+          <input
+            ref={searchInputRef}
+            type="text"
+            className="ahoy-grid-search-input"
+            placeholder="Search tracks, artists, albums... (Press '/' to focus)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery ? (
+            <button
+              type="button"
+              className="ahoy-search-clear-btn"
+              onClick={() => setSearchQuery("")}
+              title="Clear search"
+              aria-label="Clear search"
+            >
+              ✕
+            </button>
+          ) : (
+            <span className="ahoy-search-kbd-hint">/</span>
+          )}
+        </div>
+      </div>
+
+      {/* Artist Filter Pills (active when artists navigation selected) */}
+      {activeNav === "artists" && uniqueArtists.length > 0 && (
+        <div className="ahoy-artist-filter-bar" role="toolbar" aria-label="Filter by artist">
+          <button
+            type="button"
+            className={`ahoy-artist-pill ${selectedArtistFilter === "all" ? "is-active" : ""}`}
+            onClick={() => setSelectedArtistFilter("all")}
+          >
+            All Artists ({albums.length})
+          </button>
+          {uniqueArtists.map((artistName) => {
+            const count = albums.filter((a) =>
+              a.artist.toLowerCase().includes(artistName.toLowerCase())
+            ).length;
+            return (
+              <button
+                key={artistName}
+                type="button"
+                className={`ahoy-artist-pill ${selectedArtistFilter === artistName ? "is-active" : ""}`}
+                onClick={() => setSelectedArtistFilter(artistName)}
+              >
+                {artistName} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Grid Header */}
       <div className="ahoy-grid-header">
         <div className="ahoy-grid-title-wrap">
-          <span className="ahoy-grid-eyebrow">YOUR COLLECTION</span>
-          <h2 className="ahoy-grid-heading">Local Music Library</h2>
+          <span className="ahoy-grid-eyebrow">{headerInfo.eyebrow}</span>
+          <h2 className="ahoy-grid-heading">{headerInfo.heading}</h2>
         </div>
 
         <div className="ahoy-grid-header-actions">
           {/* View Mode Switcher */}
-          <div className="ahoy-view-switcher-group" role="tablist" aria-label="Collection view switcher">
+          <div
+            className="ahoy-view-switcher-group"
+            role="tablist"
+            aria-label="Collection view switcher"
+          >
             <button
               type="button"
               className={`ahoy-view-switcher-btn ${viewMode === "coverflow" ? "is-active" : ""}`}
@@ -229,35 +434,88 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
         </div>
       </div>
 
+      {/* Sovereign Storage Diagnostic Banner (if activeNav === 'logout') */}
+      {activeNav === "logout" && (
+        <div className="ahoy-sovereign-storage-card">
+          <div className="ahoy-sovereign-header">
+            <div>
+              <h3 style={{ margin: "0 0 4px 0", color: "#ffffff", fontSize: "16px" }}>
+                🔒 Sovereign Hardware & Browser Storage
+              </h3>
+              <p style={{ margin: 0, fontSize: "13px", color: "#9ca3af" }}>
+                All tracks and playlists are stored directly on your physical machine. Zero cloud streaming or DRM trackers.
+              </p>
+            </div>
+            <span className="ahoy-sovereign-badge">OFFLINE SOVEREIGN</span>
+          </div>
+
+          <div className="ahoy-sovereign-stats-grid">
+            <div className="ahoy-sovereign-stat-box">
+              <div className="ahoy-sovereign-stat-val">{albums.length}</div>
+              <div className="ahoy-sovereign-stat-lbl">Cached Tracks</div>
+            </div>
+            <div className="ahoy-sovereign-stat-box">
+              <div className="ahoy-sovereign-stat-val">100%</div>
+              <div className="ahoy-sovereign-stat-lbl">Local Privacy</div>
+            </div>
+            <div className="ahoy-sovereign-stat-box">
+              <div className="ahoy-sovereign-stat-val">0 ms</div>
+              <div className="ahoy-sovereign-stat-lbl">Network Latency</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {filteredAlbums.length === 0 && (
+        <div className="ahoy-empty-collection">
+          <div className="ahoy-empty-icon">🎵</div>
+          <h3 style={{ color: "#ffffff", margin: "0 0 6px 0" }}>
+            {searchQuery ? `No tracks matching "${searchQuery}"` : "No tracks found in this view"}
+          </h3>
+          <p style={{ margin: 0, fontSize: "13px" }}>
+            {searchQuery
+              ? "Try adjusting your search terms or clearing the filter."
+              : "Scan your device storage for local MP3 files to populate this collection."}
+          </p>
+        </div>
+      )}
+
       {/* Render selected view mode */}
-      {viewMode === "coverflow" && (
+      {filteredAlbums.length > 0 && viewMode === "coverflow" && (
         <CoverFlowView
-          albums={albums}
+          albums={filteredAlbums}
           selectedId={selectedId}
           onSelectAlbum={onSelectAlbum}
+          isFavorite={isFavorite}
+          onToggleFavorite={onToggleFavorite}
         />
       )}
 
-      {viewMode === "table" && (
+      {filteredAlbums.length > 0 && viewMode === "table" && (
         <TableView
-          albums={albums}
+          albums={filteredAlbums}
           selectedId={selectedId}
           onSelectAlbum={onSelectAlbum}
+          isFavorite={isFavorite}
+          onToggleFavorite={onToggleFavorite}
         />
       )}
 
-      {viewMode === "grid" && (
+      {filteredAlbums.length > 0 && viewMode === "grid" && (
         <div
           className={`ahoy-album-grid ahoy-album-grid--${density}`}
           role="region"
           aria-label="Music Collection"
         >
-          {albums.map((card) => (
+          {filteredAlbums.map((card) => (
             <AlbumCard
               key={card.id}
               card={card}
               isSelected={card.id === selectedId}
               onSelect={onSelectAlbum}
+              isFavorite={isFavorite ? isFavorite(card.id) : false}
+              onToggleFavorite={onToggleFavorite}
             />
           ))}
         </div>

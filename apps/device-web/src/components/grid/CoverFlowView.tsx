@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useRef } from "react";
 import { CoverArtRenderer } from "./CoverArtRenderer";
-import { ArrowLeftIcon, ArrowRightIcon } from "../common/Icons";
+import { ArrowLeftIcon, ArrowRightIcon, StarIcon } from "../common/Icons";
 import type { AlbumCardData } from "../../types/player-ui";
 
 type CoverFlowViewProps = {
   albums: AlbumCardData[];
   selectedId?: string;
   onSelectAlbum: (card: AlbumCardData) => void;
+  isFavorite?: (trackId: string) => boolean;
+  onToggleFavorite?: (trackId: string) => void;
 };
 
 export const CoverFlowView: React.FC<CoverFlowViewProps> = ({
   albums,
   selectedId,
   onSelectAlbum,
+  isFavorite,
+  onToggleFavorite,
 }) => {
   const initialIndex = Math.max(
     0,
@@ -178,13 +182,26 @@ export const CoverFlowView: React.FC<CoverFlowViewProps> = ({
           <p className="ahoy-coverflow-info-artist">
             {activeAlbum.artist} — <span className="ahoy-coverflow-info-album">{activeAlbum.album}</span>
           </p>
-          <button
-            type="button"
-            className="ahoy-coverflow-center-play-btn"
-            onClick={() => onSelectAlbum(activeAlbum)}
-          >
-            ▶ Listen to this record
-          </button>
+          <div className="ahoy-coverflow-actions-row">
+            <button
+              type="button"
+              className="ahoy-coverflow-center-play-btn"
+              onClick={() => onSelectAlbum(activeAlbum)}
+            >
+              ▶ Listen to this record
+            </button>
+            {onToggleFavorite && (
+              <button
+                type="button"
+                className={`ahoy-coverflow-fav-btn ${isFavorite?.(activeAlbum.id) ? "is-favorited" : ""}`}
+                onClick={() => onToggleFavorite(activeAlbum.id)}
+                title={isFavorite?.(activeAlbum.id) ? "Remove from Favorites" : "Add to Favorites"}
+                aria-label={isFavorite?.(activeAlbum.id) ? "Remove from Favorites" : "Add to Favorites"}
+              >
+                <StarIcon size={18} filled={isFavorite?.(activeAlbum.id)} color="var(--ahoy-accent-gold, #f59e0b)" />
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1,11 +1,14 @@
 import React from "react";
 import { CoverArtRenderer } from "./CoverArtRenderer";
+import { StarIcon } from "../common/Icons";
 import type { AlbumCardData } from "../../types/player-ui";
 
 type TableViewProps = {
   albums: AlbumCardData[];
   selectedId?: string;
   onSelectAlbum: (card: AlbumCardData) => void;
+  isFavorite?: (trackId: string) => boolean;
+  onToggleFavorite?: (trackId: string) => void;
 };
 
 function formatDuration(ms?: number): string {
@@ -20,6 +23,8 @@ export const TableView: React.FC<TableViewProps> = ({
   albums,
   selectedId,
   onSelectAlbum,
+  isFavorite,
+  onToggleFavorite,
 }) => {
   return (
     <div className="ahoy-table-view-container" role="region" aria-label="Library Table">
@@ -27,6 +32,7 @@ export const TableView: React.FC<TableViewProps> = ({
         <thead>
           <tr>
             <th className="ahoy-col-th ahoy-th-num">#</th>
+            <th className="ahoy-col-th ahoy-th-fav">★</th>
             <th className="ahoy-col-th ahoy-th-title">TITLE</th>
             <th className="ahoy-col-th ahoy-th-artist">ARTIST</th>
             <th className="ahoy-col-th ahoy-th-album">ALBUM</th>
@@ -37,6 +43,7 @@ export const TableView: React.FC<TableViewProps> = ({
         <tbody>
           {albums.map((album, idx) => {
             const isSelected = album.id === selectedId;
+            const fav = isFavorite ? isFavorite(album.id) : false;
             return (
               <tr
                 key={album.id}
@@ -49,6 +56,22 @@ export const TableView: React.FC<TableViewProps> = ({
                     <span className="ahoy-playing-indicator" title="Selected">▶</span>
                   ) : (
                     <span>{idx + 1}</span>
+                  )}
+                </td>
+                <td className="ahoy-td-fav">
+                  {onToggleFavorite && (
+                    <button
+                      type="button"
+                      className={`ahoy-table-fav-btn ${fav ? "is-favorited" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFavorite(album.id);
+                      }}
+                      title={fav ? "Remove from Favorites" : "Add to Favorites"}
+                      aria-label={fav ? "Remove from Favorites" : "Add to Favorites"}
+                    >
+                      <StarIcon size={14} filled={fav} />
+                    </button>
                   )}
                 </td>
                 <td className="ahoy-td-title">

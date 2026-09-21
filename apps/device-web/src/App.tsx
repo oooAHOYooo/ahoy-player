@@ -16,8 +16,10 @@ import { defaultMockAlbums } from "./components/grid/AlbumGrid";
 import { useThemeStudio } from "./hooks/useThemeStudio";
 import { useWorkspaceColumns } from "./hooks/useWorkspaceColumns";
 import { useSleepTimer } from "./hooks/useSleepTimer";
+import { usePlaylists } from "./hooks/usePlaylists";
 import { useAhoyInput } from "@ahoy/player-ui-dial";
 import type { NavItemId, AlbumCardData, DockTabId } from "./types/player-ui";
+import type { RepeatMode } from "./components/player/TransportControls";
 
 const fileImport = new BrowserFileImportAdapter();
 const persistence = new LocalStoragePersistenceAdapter("ahoy-player:web:v1");
@@ -30,6 +32,17 @@ export function App() {
     persistence,
     playbackAdapter,
   });
+
+  // Sovereign Playlists & Favorites Hook
+  const {
+    playlists,
+    favorites,
+    createPlaylist,
+    deletePlaylist,
+    toggleTrackInPlaylist,
+    toggleFavorite,
+    isFavorite,
+  } = usePlaylists();
 
   // Sovereign AHOY ID & Entitlements state
   const [ahoyId, setAhoyId] = useState<string | null>(() => {
@@ -87,10 +100,35 @@ export function App() {
   const [draggingCol, setDraggingCol] = useState<number | null>(null);
   const [dragOverCol, setDragOverCol] = useState<number | null>(null);
 
+  // Dynamic filter based on left sidebar navigation
+  const activePlaylist = playlists.find(
+    (p) =>
+      p.id === activeNav ||
+      (activeNav === "top-playlists-1" && p.id === playlists[0]?.id) ||
+      (activeNav === "top-playlists-2" && p.id === playlists[1]?.id)
+  );
+
+  const displayedAlbums: AlbumCardData[] = React.useMemo(() => {
+    if (activeNav === "recently-added-star") {
+      return allAlbums.filter((a) => favorites.includes(a.id));
+    }
+    if (activeNav === "recently-added-clock") {
+      return [...allAlbums].reverse();
+    }
+    if (activePlaylist) {
+      return allAlbums.filter((a) => activePlaylist.trackIds.includes(a.id));
+    }
+    return allAlbums;
+  }, [allAlbums, activeNav, favorites, activePlaylist]);
+
   // Track selection state
   const [selectedAlbum, setSelectedAlbum] = useState<AlbumCardData>(allAlbums[0]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
+
+  // Shuffle & Repeat transport state
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
 
   // Theme Studio and color variables state
   const {
@@ -156,15 +194,60 @@ export function App() {
   };
 
   const handlePrevious = () => {
-    const currentIndex = defaultMockAlbums.findIndex((a) => a.id === selectedAlbum.id);
-    const prevIndex = currentIndex > 0 ? currentIndex - 1 : defaultMockAlbums.length - 1;
-    handleSelectAlbum(defaultMockAlbums[prevIndex]);
+    const pool = displayedAlbums.length > 0 ? displayedAlbums : allAlbums;
+    const currentIndex = pool.findIndex((a) => a.id === selectedAlbum.id);
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : pool.length - 1;
+    handleSelectAlbum(pool[prevIndex]);
   };
 
   const handleNext = () => {
-    const currentIndex = defaultMockAlbums.findIndex((a) => a.id === selectedAlbum.id);
-    const nextIndex = currentIndex < defaultMockAlbums.length - 1 ? currentIndex + 1 : 0;
-    handleSelectAlbum(defaultMockAlbums[nextIndex]);
+    const pool = displayedAlbums.length > 0 ? displayedAlbums : allAlbums;
+    if (repeatMode === "one") {
+      handleSelectAlbum(selectedAlbum);
+      return;
+    }
+    if (isShuffle && pool.length > 1) {
+      let nextIdx = Math.floor(Math.random() * pool.length);
+      const currIdx = pool.findIndex((a) => a.id === selectedAlbum.id);
+      if (nextIdx === currIdx) {
+        nextIdx = (nextIdx + 1) % pool.length;
+      }
+      handleSelectAlbum(pool[nextIdx]);
+      return;
+    }
+    const currentIndex = pool.findIndex((a) => a.id === selectedAlbum.id);
+    const nextIndex = currentIndex < pool.length - 1 ? currentIndex + 1 : 0;
+    handleSelectAlbum(pool[nextIndex]);
+  };
+
+  // Dynamic Navigation click handler
+  const handleSelectNav = (id: NavItemId) => {
+    setActiveNav(id);
+    if (id === "transitions") {
+      setColumnPanel(2, "visualizer");
+    } else if (id === "audio") {
+      setColumnPanel(2, "dial");
+    } else {
+      // Ensure column 1 displays grid
+      if (columns[1] !== "grid") {
+        setColumnPanel(1, "grid");
+      }
+    }
+  };
+
+  const handleCreatePlaylist = (name: string) => {
+    const newPl = createPlaylist(name);
+    setActiveNav(newPl.id);
+    if (columns[1] !== "grid") {
+      setColumnPanel(1, "grid");
+    }
+  };
+
+  const handleDeletePlaylist = (id: string) => {
+    deletePlaylist(id);
+    if (activeNav === id) {
+      setActiveNav("playlists");
+    }
   };
 
   // Connect tactile Hardware Dial / Keyboard / Gamepad input bus
@@ -308,12 +391,12 @@ export function App() {
                   <ColumnPanelRenderer
                     panelId={panelId}
                     activeNav={activeNav}
-                    onSelectNav={setActiveNav}
+                    onSelectNav={handleSelectNav}
                     selectedAlbum={selectedAlbum}
                     onSelectAlbum={handleSelectAlbum}
                     onScanMp3s={() => void model.importFiles()}
                     isScanning={model.isImporting}
-                    albums={allAlbums}
+                    albums={displayedAlbums}
                     nauticalThemes={nauticalThemes}
                     activeThemeId={activeThemeId}
                     onSelectTheme={applyNauticalTheme}
@@ -331,6 +414,16 @@ export function App() {
                     positionMs={activePositionMs}
                     durationMs={activeDurationMs}
                     volume={currentVolume}
+                    playlists={playlists}
+                    onCreatePlaylist={handleCreatePlaylist}
+                    onDeletePlaylist={handleDeletePlaylist}
+                    favoritesCount={favorites.length}
+                    totalTracksCount={allAlbums.length}
+                    artistsCount={new Set(allAlbums.map((a) => a.artist.split(" / ")[0].trim())).size}
+                    albumsCount={new Set(allAlbums.map((a) => a.album)).size}
+                    playlistName={activePlaylist?.name}
+                    isFavorite={isFavorite}
+                    onToggleFavorite={toggleFavorite}
                   />
                 </div>
               </section>
@@ -377,6 +470,12 @@ export function App() {
         selectedSleepOption={sleepTimer.selectedOption}
         formattedSleepRemaining={sleepTimer.formattedRemaining}
         onSetSleepTimer={sleepTimer.setTimer}
+        isShuffle={isShuffle}
+        onToggleShuffle={() => setIsShuffle((prev) => !prev)}
+        repeatMode={repeatMode}
+        onCycleRepeat={() =>
+          setRepeatMode((prev) => (prev === "off" ? "all" : prev === "all" ? "one" : "off"))
+        }
         statusText="READY."
         subStatusText="QUEUE NATIVE RUST STATE. LOCAL FILES NEVER UPLOADED."
       />

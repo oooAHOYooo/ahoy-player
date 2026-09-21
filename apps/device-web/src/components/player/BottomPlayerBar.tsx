@@ -1,6 +1,6 @@
 import React from "react";
 import { TrackInfo } from "./TrackInfo";
-import { TransportControls } from "./TransportControls";
+import { TransportControls, type RepeatMode } from "./TransportControls";
 import { TimelineScrubber } from "./TimelineScrubber";
 import { VolumeControl } from "./VolumeControl";
 import { StatusBar } from "./StatusBar";
@@ -26,6 +26,10 @@ type BottomPlayerBarProps = {
   selectedSleepOption?: SleepTimerOption;
   formattedSleepRemaining?: string | null;
   onSetSleepTimer?: (opt: SleepTimerOption) => void;
+  isShuffle?: boolean;
+  onToggleShuffle?: () => void;
+  repeatMode?: RepeatMode;
+  onCycleRepeat?: () => void;
   statusText?: string;
   subStatusText?: string;
 };
@@ -49,6 +53,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
   selectedSleepOption = "off",
   formattedSleepRemaining = null,
   onSetSleepTimer = () => {},
+  isShuffle = false,
+  onToggleShuffle,
+  repeatMode = "off",
+  onCycleRepeat,
   statusText,
   subStatusText,
 }) => {
@@ -69,6 +77,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
             onTogglePlay={onTogglePlay}
             onPrevious={onPrevious}
             onNext={onNext}
+            isShuffle={isShuffle}
+            onToggleShuffle={onToggleShuffle}
+            repeatMode={repeatMode}
+            onCycleRepeat={onCycleRepeat}
           />
           <TimelineScrubber
             currentMs={positionMs}

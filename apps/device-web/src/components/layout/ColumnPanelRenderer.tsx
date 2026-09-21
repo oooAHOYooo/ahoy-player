@@ -13,6 +13,7 @@ import type {
   ColorVariable,
   NauticalTheme,
 } from "../../types/player-ui";
+import type { Playlist } from "../../hooks/usePlaylists";
 
 type ColumnPanelRendererProps = {
   panelId: WorkspacePanelId;
@@ -40,6 +41,16 @@ type ColumnPanelRendererProps = {
   positionMs?: number;
   durationMs?: number;
   volume?: number;
+  playlists?: Playlist[];
+  onCreatePlaylist?: (name: string) => void;
+  onDeletePlaylist?: (id: string) => void;
+  favoritesCount?: number;
+  totalTracksCount?: number;
+  artistsCount?: number;
+  albumsCount?: number;
+  playlistName?: string;
+  isFavorite?: (trackId: string) => boolean;
+  onToggleFavorite?: (trackId: string) => void;
 };
 
 export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
@@ -68,6 +79,16 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
   positionMs = 0,
   durationMs = 180000,
   volume = 0.8,
+  playlists = [],
+  onCreatePlaylist,
+  onDeletePlaylist,
+  favoritesCount = 0,
+  totalTracksCount = 0,
+  artistsCount,
+  albumsCount,
+  playlistName,
+  isFavorite,
+  onToggleFavorite,
 }) => {
   switch (panelId) {
     case "sidebar":
@@ -76,6 +97,13 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
           activeId={activeNav}
           onSelect={onSelectNav}
           onScanMp3s={onScanMp3s}
+          playlists={playlists}
+          onCreatePlaylist={onCreatePlaylist}
+          onDeletePlaylist={onDeletePlaylist}
+          favoritesCount={favoritesCount}
+          totalTracksCount={totalTracksCount}
+          artistsCount={artistsCount}
+          albumsCount={albumsCount}
         />
       );
 
@@ -87,6 +115,10 @@ export const ColumnPanelRenderer: React.FC<ColumnPanelRendererProps> = ({
           onSelectAlbum={onSelectAlbum}
           onScanMp3s={onScanMp3s}
           isScanning={isScanning}
+          activeNav={activeNav}
+          playlistName={playlistName}
+          isFavorite={isFavorite}
+          onToggleFavorite={onToggleFavorite}
         />
       );
 

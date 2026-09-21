@@ -113,6 +113,28 @@
   transform: scale(1.06);
 }
 
+.ahoy-transport-btn.is-active {
+  color: var(--ahoy-accent-teal);
+}
+
+.ahoy-transport-repeat-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ahoy-transport-repeat-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  font-size: 8px;
+  font-weight: 800;
+  font-family: var(--ahoy-font-mono);
+  color: var(--ahoy-accent-teal);
+  line-height: 1;
+}
+
 /* Scrubber Timeline */
 .ahoy-player-scrubber-row {
   display: flex;

@@ -509,3 +509,305 @@
   transform: scale(1.1);
 }
 
+/* Search Bar in Grid Header */
+.ahoy-grid-search-container {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto 16px auto;
+}
+
+.ahoy-grid-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--ahoy-border-subtle);
+  border-radius: 8px;
+  padding: 8px 14px;
+  transition: all 0.15s ease;
+}
+
+.ahoy-grid-search-wrap:focus-within {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--ahoy-accent-teal);
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.18);
+}
+
+.ahoy-grid-search-icon {
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ahoy-grid-search-wrap:focus-within .ahoy-grid-search-icon {
+  color: var(--ahoy-accent-teal);
+}
+
+.ahoy-grid-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 13.5px;
+  outline: none;
+}
+
+.ahoy-grid-search-input::placeholder {
+  color: #6b7280;
+}
+
+.ahoy-search-clear-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #d1d5db;
+  font-size: 11px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ahoy-search-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.ahoy-search-kbd-hint {
+  font-size: 10.5px;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--ahoy-font-mono);
+}
+
+/* Artist Filter Pills */
+.ahoy-artist-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 900px;
+  margin: 0 auto 18px auto;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.ahoy-artist-filter-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.ahoy-artist-pill {
+  white-space: nowrap;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #9ca3af;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ahoy-artist-pill:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.ahoy-artist-pill.is-active {
+  background: var(--ahoy-accent-teal);
+  color: #0b1719;
+  font-weight: 700;
+  border-color: var(--ahoy-accent-teal);
+  box-shadow: 0 2px 8px rgba(45, 212, 191, 0.25);
+}
+
+/* Star Favorite Buttons */
+.ahoy-card-fav-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(13, 21, 32, 0.7);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: all 0.15s ease;
+  z-index: 5;
+}
+
+.ahoy-album-card:hover .ahoy-card-fav-btn,
+.ahoy-card-fav-btn.is-favorited {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ahoy-card-fav-btn.is-favorited {
+  color: var(--ahoy-accent-gold, #f59e0b);
+  border-color: var(--ahoy-accent-gold, #f59e0b);
+  background: rgba(13, 21, 32, 0.9);
+}
+
+.ahoy-card-fav-btn:hover {
+  transform: scale(1.1);
+  color: var(--ahoy-accent-gold, #f59e0b);
+}
+
+.ahoy-album-card-art-wrap {
+  position: relative;
+}
+
+/* Table Favorite Button */
+.ahoy-th-fav {
+  width: 36px;
+  text-align: center;
+}
+
+.ahoy-td-fav {
+  text-align: center;
+}
+
+.ahoy-table-fav-btn {
+  background: transparent;
+  border: none;
+  color: #4b5563;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+}
+
+.ahoy-track-row:hover .ahoy-table-fav-btn {
+  color: #9ca3af;
+}
+
+.ahoy-table-fav-btn.is-favorited {
+  color: var(--ahoy-accent-gold, #f59e0b);
+}
+
+.ahoy-table-fav-btn:hover {
+  color: var(--ahoy-accent-gold, #f59e0b);
+  transform: scale(1.2);
+}
+
+/* Cover Flow Actions Row */
+.ahoy-coverflow-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.ahoy-coverflow-fav-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ahoy-coverflow-fav-btn:hover,
+.ahoy-coverflow-fav-btn.is-favorited {
+  color: var(--ahoy-accent-gold, #f59e0b);
+  border-color: var(--ahoy-accent-gold, #f59e0b);
+  transform: scale(1.08);
+}
+
+/* Sovereign Storage Card */
+.ahoy-sovereign-storage-card {
+  max-width: 900px;
+  margin: 0 auto;
+  background: linear-gradient(135deg, rgba(20, 30, 42, 0.8), rgba(13, 21, 32, 0.9));
+  border: 1px solid var(--ahoy-border-subtle);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.ahoy-sovereign-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ahoy-sovereign-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(45, 212, 191, 0.15);
+  color: var(--ahoy-accent-teal);
+  border: 1px solid rgba(45, 212, 191, 0.3);
+}
+
+.ahoy-sovereign-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ahoy-sovereign-stat-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.ahoy-sovereign-stat-val {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ahoy-text-main);
+  margin-bottom: 4px;
+}
+
+.ahoy-sovereign-stat-lbl {
+  font-size: 11px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ahoy-empty-collection {
+  max-width: 900px;
+  margin: 40px auto;
+  text-align: center;
+  padding: 48px 24px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #9ca3af;
+}
+
+.ahoy-empty-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+

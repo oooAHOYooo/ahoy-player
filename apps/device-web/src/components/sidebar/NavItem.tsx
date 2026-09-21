@@ -1,12 +1,13 @@
 import React from "react";
 
-type NavItemProps = {
+export type NavItemProps = {
   id: string;
   label: string;
   icon: React.ReactNode;
   active?: boolean;
   onClick?: () => void;
   count?: number;
+  rightAction?: React.ReactNode;
 };
 
 export const NavItem: React.FC<NavItemProps> = ({
@@ -15,18 +16,24 @@ export const NavItem: React.FC<NavItemProps> = ({
   active = false,
   onClick,
   count,
+  rightAction,
 }) => {
   return (
-    <button
-      type="button"
-      className={`ahoy-nav-item ${active ? "is-active" : ""}`}
-      onClick={onClick}
-    >
-      <span className="ahoy-nav-item-icon">{icon}</span>
-      <span className="ahoy-nav-item-label">{label}</span>
-      {typeof count === "number" && (
-        <span className="ahoy-nav-item-count">{count}</span>
+    <div className={`ahoy-nav-item-wrap ${active ? "is-active" : ""}`}>
+      <button
+        type="button"
+        className={`ahoy-nav-item ${active ? "is-active" : ""}`}
+        onClick={onClick}
+      >
+        <span className="ahoy-nav-item-icon">{icon}</span>
+        <span className="ahoy-nav-item-label">{label}</span>
+        {typeof count === "number" && (
+          <span className="ahoy-nav-item-count">{count}</span>
+        )}
+      </button>
+      {rightAction && (
+        <div className="ahoy-nav-item-right-action">{rightAction}</div>
       )}
-    </button>
+    </div>
   );
 };

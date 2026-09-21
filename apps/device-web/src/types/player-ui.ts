@@ -49,7 +49,8 @@ export type NavItemId =
   | "top-playlists-2"
   | "recently-added-clock"
   | "recently-added-star"
-  | "logout";
+  | "logout"
+  | (string & {});
 
 export type WorkspacePanelId =
   | "sidebar"
