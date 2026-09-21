@@ -5,6 +5,7 @@ import { TimelineScrubber } from "./TimelineScrubber";
 import { VolumeControl } from "./VolumeControl";
 import { StatusBar } from "./StatusBar";
 import type { AlbumCardData } from "../../types/player-ui";
+import type { SleepTimerOption } from "../../hooks/useSleepTimer";
 
 type BottomPlayerBarProps = {
   currentTrack?: AlbumCardData;
@@ -20,6 +21,11 @@ type BottomPlayerBarProps = {
   onToggleQueue?: () => void;
   onToggleVisualizer?: () => void;
   onToggleDial?: () => void;
+  playbackRate?: number;
+  onChangePlaybackRate?: (rate: number) => void;
+  selectedSleepOption?: SleepTimerOption;
+  formattedSleepRemaining?: string | null;
+  onSetSleepTimer?: (opt: SleepTimerOption) => void;
   statusText?: string;
   subStatusText?: string;
 };
@@ -38,6 +44,11 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
   onToggleQueue,
   onToggleVisualizer,
   onToggleDial,
+  playbackRate = 1.0,
+  onChangePlaybackRate = () => {},
+  selectedSleepOption = "off",
+  formattedSleepRemaining = null,
+  onSetSleepTimer = () => {},
   statusText,
   subStatusText,
 }) => {
@@ -63,6 +74,8 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
             currentMs={positionMs}
             totalMs={durationMs}
             onSeek={onSeek}
+            playbackRate={playbackRate}
+            onChangePlaybackRate={onChangePlaybackRate}
           />
         </div>
 
@@ -73,6 +86,9 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
             onToggleQueue={onToggleQueue}
             onToggleVisualizer={onToggleVisualizer}
             onToggleDial={onToggleDial}
+            selectedSleepOption={selectedSleepOption}
+            formattedSleepRemaining={formattedSleepRemaining}
+            onSetSleepTimer={onSetSleepTimer}
           />
         </div>
       </section>

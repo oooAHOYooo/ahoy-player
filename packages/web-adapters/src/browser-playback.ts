@@ -70,6 +70,20 @@ export class BrowserAudioPlaybackAdapter implements PlaybackAdapter {
     this.update(reducePlayback(this.state, { type: "set-volume", volume }));
   }
 
+  setPlaybackRate(rate: number): void {
+    if (Number.isFinite(rate) && rate > 0) {
+      this.audio.playbackRate = rate;
+    }
+  }
+
+  getPlaybackRate(): number {
+    return this.audio.playbackRate;
+  }
+
+  getAudioElement(): HTMLAudioElement {
+    return this.audio;
+  }
+
   getState(): PlaybackState { return this.state; }
 
   subscribe(listener: (state: PlaybackState) => void): Unsubscribe {

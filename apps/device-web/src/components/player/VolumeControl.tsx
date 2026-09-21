@@ -1,5 +1,7 @@
 import React from "react";
 import { VolumeIcon, MenuListIcon, WaveformIcon, DialIcon } from "../common/Icons";
+import { SleepTimerControl } from "./SleepTimerControl";
+import type { SleepTimerOption } from "../../hooks/useSleepTimer";
 
 type VolumeControlProps = {
   volume: number; // 0 to 1
@@ -7,6 +9,9 @@ type VolumeControlProps = {
   onToggleQueue?: () => void;
   onToggleVisualizer?: () => void;
   onToggleDial?: () => void;
+  selectedSleepOption?: SleepTimerOption;
+  formattedSleepRemaining?: string | null;
+  onSetSleepTimer?: (opt: SleepTimerOption) => void;
 };
 
 export const VolumeControl: React.FC<VolumeControlProps> = ({
@@ -15,6 +20,9 @@ export const VolumeControl: React.FC<VolumeControlProps> = ({
   onToggleQueue,
   onToggleVisualizer,
   onToggleDial,
+  selectedSleepOption = "off",
+  formattedSleepRemaining = null,
+  onSetSleepTimer = () => {},
 }) => {
   const percent = Math.round(volume * 100);
 
@@ -61,6 +69,12 @@ export const VolumeControl: React.FC<VolumeControlProps> = ({
       >
         <DialIcon size={16} />
       </button>
+
+      <SleepTimerControl
+        selectedOption={selectedSleepOption}
+        formattedRemaining={formattedSleepRemaining}
+        onSetTimer={onSetSleepTimer}
+      />
 
       <button
         type="button"

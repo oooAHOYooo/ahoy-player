@@ -15,6 +15,7 @@ import { BottomPlayerBar } from "./components/player/BottomPlayerBar";
 import { defaultMockAlbums } from "./components/grid/AlbumGrid";
 import { useThemeStudio } from "./hooks/useThemeStudio";
 import { useWorkspaceColumns } from "./hooks/useWorkspaceColumns";
+import { useSleepTimer } from "./hooks/useSleepTimer";
 import { useAhoyInput } from "@ahoy/player-ui-dial";
 import type { NavItemId, AlbumCardData, DockTabId } from "./types/player-ui";
 
@@ -212,6 +213,30 @@ export function App() {
   const activeDurationMs = model.playback.durationMs || selectedAlbum.durationMs || 115000;
   const currentVolume = model.playback.volume ?? 0.75;
 
+  // Playback speed state
+  const [playbackRate, setPlaybackRate] = useState<number>(1.0);
+
+  const handleChangePlaybackRate = (rate: number) => {
+    setPlaybackRate(rate);
+    playbackAdapter.setPlaybackRate(rate);
+  };
+
+  // Sleep Timer (Night Watch)
+  const sleepTimer = useSleepTimer({
+    isPlaying: activeIsPlaying,
+    onPause: () => {
+      if (model.playback.status === "playing") {
+        model.togglePlayback();
+      } else {
+        setIsPlaying(false);
+      }
+    },
+    currentVolume,
+    onSetVolume: (vol) => model.setVolume(vol),
+    positionMs: activePositionMs,
+    durationMs: activeDurationMs,
+  });
+
   return (
     <div className="ahoy-app-container">
       {/* Window Title Bar */}
@@ -347,6 +372,11 @@ export function App() {
         onToggleQueue={() => setColumnPanel(2, "queue")}
         onToggleVisualizer={() => setColumnPanel(2, "visualizer")}
         onToggleDial={() => setColumnPanel(2, "dial")}
+        playbackRate={playbackRate}
+        onChangePlaybackRate={handleChangePlaybackRate}
+        selectedSleepOption={sleepTimer.selectedOption}
+        formattedSleepRemaining={sleepTimer.formattedRemaining}
+        onSetSleepTimer={sleepTimer.setTimer}
         statusText="READY."
         subStatusText="QUEUE NATIVE RUST STATE. LOCAL FILES NEVER UPLOADED."
       />

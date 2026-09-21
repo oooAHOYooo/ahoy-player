@@ -1,9 +1,12 @@
 import React from "react";
+import { PlaybackSpeedControl } from "./PlaybackSpeedControl";
 
 type TimelineScrubberProps = {
   currentMs: number;
   totalMs: number;
   onSeek: (ms: number) => void;
+  playbackRate?: number;
+  onChangePlaybackRate?: (rate: number) => void;
 };
 
 function formatMs(ms: number): string {
@@ -17,6 +20,8 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
   currentMs,
   totalMs,
   onSeek,
+  playbackRate = 1.0,
+  onChangePlaybackRate = () => {},
 }) => {
   const progressPercent = totalMs > 0 ? Math.min(100, (currentMs / totalMs) * 100) : 0;
 
@@ -40,6 +45,10 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
       <span className="ahoy-player-time ahoy-player-time--total">
         {formatMs(totalMs)}
       </span>
+      <PlaybackSpeedControl
+        currentSpeed={playbackRate}
+        onChangeSpeed={onChangePlaybackRate}
+      />
     </div>
   );
 };

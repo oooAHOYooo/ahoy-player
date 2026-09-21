@@ -267,3 +267,232 @@
   color: #6b7280;
   font-weight: 600;
 }
+
+/* Playback Speed Control */
+.ahoy-speed-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ahoy-speed-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10.5px;
+  font-family: var(--ahoy-font-mono);
+  font-weight: 600;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.ahoy-speed-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--ahoy-text-main);
+}
+
+.ahoy-speed-btn.is-custom {
+  background-color: rgba(45, 212, 191, 0.15);
+  border-color: rgba(45, 212, 191, 0.35);
+  color: var(--ahoy-accent-teal);
+  font-weight: 700;
+}
+
+.ahoy-speed-icon {
+  opacity: 0.7;
+}
+
+.ahoy-speed-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: #151d22;
+  border: 1px solid var(--ahoy-border-subtle);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ahoy-speed-popover-title {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  padding: 2px 6px 6px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ahoy-speed-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ahoy-speed-opt-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-family: var(--ahoy-font-mono);
+  color: #d1d5db;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.ahoy-speed-opt-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.ahoy-speed-opt-btn.is-selected {
+  background-color: rgba(45, 212, 191, 0.18);
+  color: var(--ahoy-accent-teal);
+  font-weight: 700;
+}
+
+.ahoy-speed-label {
+  font-size: 10px;
+  color: #6b7280;
+  font-family: var(--ahoy-font-sans);
+}
+
+/* Sleep Timer Control */
+.ahoy-sleep-timer-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ahoy-sleep-timer-trigger {
+  position: relative;
+}
+
+.ahoy-sleep-timer-trigger.is-active {
+  color: var(--ahoy-accent-teal);
+}
+
+.ahoy-sleep-badge {
+  position: absolute;
+  top: -8px;
+  right: -12px;
+  background: var(--ahoy-accent-teal);
+  color: #0b1719;
+  font-size: 8.5px;
+  font-family: var(--ahoy-font-mono);
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 6px;
+  line-height: 1.2;
+}
+
+.ahoy-sleep-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: -20px;
+  background: #141f26;
+  border: 1px solid var(--ahoy-border-subtle);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ahoy-sleep-popover-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ahoy-sleep-popover-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ahoy-accent-teal);
+  text-transform: uppercase;
+}
+
+.ahoy-sleep-popover-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ahoy-text-main);
+}
+
+.ahoy-sleep-popover-status {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.ahoy-sleep-highlight {
+  font-family: var(--ahoy-font-mono);
+  color: var(--ahoy-accent-teal);
+  font-weight: 700;
+}
+
+.ahoy-sleep-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ahoy-sleep-opt-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #d1d5db;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.ahoy-sleep-opt-btn:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.ahoy-sleep-opt-btn.is-selected {
+  background-color: rgba(45, 212, 191, 0.16);
+  color: var(--ahoy-accent-teal);
+  font-weight: 600;
+}
+
+.ahoy-sleep-opt-btn--cancel {
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 8px;
+  color: #f87171;
+  font-weight: 600;
+}
+
+.ahoy-sleep-opt-btn--cancel:hover {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+}
+
+.ahoy-opt-check {
+  font-size: 11px;
+  font-weight: 700;
+}
+
