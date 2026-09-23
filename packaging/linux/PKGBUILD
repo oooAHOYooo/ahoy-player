@@ -1,5 +1,5 @@
 pkgname=ahoy-player
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=1
 pkgdesc='Local-first music player with native GUI and terminal companion'
 arch=('x86_64')

@@ -3,7 +3,7 @@
 ## What is now in place
 
 - `ahoy player` launches the terminal UI; `ahoy scan ~/Music` indexes local MP3s.
-- `apps/terminal` is prepared as the public npm package `@ahoy/player-terminal` at version `0.2.0`.
+- `apps/terminal` is prepared as the public npm package `@ahoy/player-terminal` at version `0.2.1`.
 - `scripts/install-cli.sh` is the immediate macOS/Linux installer. It clones or fast-forwards this repository, then globally installs `apps/terminal`, making `ahoy` available from any directory.
 - The public-site repository `oooAHOYooo.github.io` has an updated `download.html` CLI card that runs the raw installer above.
 - `apps/device-web/public/download.html` no longer links to a nonexistent Arch package; it links to the verified native Linux archive and documents the CLI installer.
