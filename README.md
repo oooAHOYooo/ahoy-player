@@ -83,4 +83,47 @@ npm run ahoy -- scan ~/Music
 npm run ahoy -- player
 ```
 
+In the terminal player, press **v** to switch between the original live deck and
+**Terminal Art**. Artwork uses monochrome Unicode braille within the original
+left-aligned deck, preserving the terminal's own colors and track list, sized to
+the terminal (up to 90 columns; shorter terminals use fewer columns to preserve
+the square artwork). Install FFmpeg for cover decoding and duration metadata.
+
+An empty library still opens the player with a welcome screen. Press **s** to
+scan `~/Music`, or **r** to reload after adding files from another shell.
+`ahoy scan` defaults to `~/Music`; if an interactive scan leaves the library
+empty, it opens this welcome screen automatically. Piped scans still exit normally.
+Embedded MP3 covers take priority over adjacent `cover.jpg`, `cover.png`,
+`folder.jpg`, or `folder.png`. Missing artwork shows a procedural braille CD with
+rotating reflections and a dot orbiting its track, in either deck view.
+
+Terminal Art keys: **↑/↓** select, **Enter** play, **Space** play/pause,
+**[ / ]** previous/next, **Tab / Shift+Tab** focus labeled controls, **Enter**
+activate, **b** toggle ASCII fallback, **v** return to the deck, **x** quit.
+Use `AHOY_ASCII=1` for fonts without braille support. The CD spins only during
+playback and freezes on pause. Press **z** to turn motion off, or launch with
+`AHOY_REDUCED_MOTION=1`. Album covers themselves remain static;
+elapsed time is estimated from the playback process clock and freezes on pause.
+Terminal emulators do not expose font coverage or DOM accessibility semantics;
+the fallback is explicit, with visible keyboard focus and text labels.
+
+Mixer keys work in both views: **8/9** lower/raise master volume, **1/2** lower/raise
+the original song, and **3/4** lower/raise remix notes, in 5% steps (0–100%).
+Master multiplies both channel levels; it never changes your system volume.
+Press **m** during playback to toggle QWERTY remix notes in either view.
+The piano layout and uppercase synth/delay sounds are available in remix mode.
+**5/6/7** toggle echo, chorus, and lo-fi (moved from 1–3 to avoid mixer conflicts).
+**Esc** leaves remix mode; letter shortcuts such as **z**, **v**, and **b** then
+control the deck again. **8/9** always control master volume.
+The TUI prefers **mpv** for live mixing without restarting tracks. With fallback
+players, levels apply when starting a track or note; the mixer displays a notice
+that mpv is required for live changes. Levels last for the current TUI session.
+
+Artwork processing runs in a Node worker with asynchronous FFmpeg subprocesses.
+Bounded in-memory caches share decoded images by SHA-256 and rendered results by
+hash/size; returning to a cached cover does not decode it again. Resize only
+converts a small cached grayscale image. Caches reset when the TUI exits.
+Run `npm test --workspace @ahoy/player-terminal` for conversion, caching, and
+FFmpeg integration tests (the integration test skips when FFmpeg is unavailable).
+
 The native desktop application does not use Electron, Tauri, Chromium, WebView, React, HTML, or CSS. `apps/device-web` is retained only as an optional browser experiment and is not part of the macOS/Linux desktop product.

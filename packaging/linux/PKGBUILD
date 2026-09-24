@@ -7,8 +7,8 @@ install=ahoy-player.install
 url='https://github.com/oooAHOYooo/ahoy-player'
 license=('MIT')
 depends=('alsa-lib' 'fontconfig' 'glibc' 'libxkbcommon' 'nodejs' 'wayland')
-optdepends=('mpv: audio playback for the ahoy terminal companion'
-            'ffmpeg: provides ffplay as an alternate terminal audio backend')
+optdepends=('mpv: audio playback and live song/remix/master mixing for the terminal companion'
+            'ffmpeg: Terminal Art cover decoding and ffplay audio playback')
 source=("${pkgname}-${pkgver}.tar.gz")
 sha256sums=('SKIP')
 
@@ -23,6 +23,9 @@ package() {
   install -Dm755 "${cargo_target}/release/ahoy-player" "${pkgdir}/usr/bin/ahoy-player"
   install -Dm755 packaging/linux/ahoy "${pkgdir}/usr/bin/ahoy"
   install -Dm644 apps/terminal/ahoy.mjs "${pkgdir}/usr/lib/ahoy-player-terminal/ahoy.mjs"
+  install -Dm644 apps/terminal/terminal-art.mjs "${pkgdir}/usr/lib/ahoy-player-terminal/terminal-art.mjs"
+  install -Dm644 apps/terminal/artwork-worker.mjs "${pkgdir}/usr/lib/ahoy-player-terminal/artwork-worker.mjs"
+  install -Dm644 apps/terminal/audio-mixer.mjs "${pkgdir}/usr/lib/ahoy-player-terminal/audio-mixer.mjs"
   install -Dm644 apps/terminal/assets/ahoy-demo.mp3 "${pkgdir}/usr/lib/ahoy-player-terminal/assets/ahoy-demo.mp3"
   install -Dm644 packaging/linux/ahoy-player.desktop "${pkgdir}/usr/share/applications/ahoy-player.desktop"
 }

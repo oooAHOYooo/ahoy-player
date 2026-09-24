@@ -6,6 +6,9 @@ import { homedir, platform, tmpdir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
+import { Worker } from "node:worker_threads";
+import { artColumns, clockLabel, terminalText, spinningDisc } from "./terminal-art.mjs";
+import { AudioMixer } from "./audio-mixer.mjs";
 
 // This is deliberately the same path and JSON shape used by the native player.
 // AHOY_PLAYER_HOME remains useful for tests and portable installs.
@@ -195,8 +198,9 @@ function printTracks(tracks) {
   tracks.forEach((track, index) => console.log(`${accent(String(index + 1).padStart(3, " "))}  ${track.title}\n     ${dim(`${track.artist} · ${track.album}`)}`));
 }
 
-function playerCommand(volume = 1, startOffset = 0) {
+function playerCommand(volume = 1, startOffset = 0, liveMix = false) {
   const vol = Math.max(0, Math.min(2.0, volume));
+  if (liveMix && spawnSync("which", ["mpv"], { stdio: "ignore" }).status === 0) return { command: "mpv", baseArgs: ["--no-video", ...(startOffset > 0 ? [`--start=${startOffset}`] : [])] };
   if (platform() === "darwin") return { command: "afplay", baseArgs: ["-v", String(vol)] };
   for (const candidate of [
     ["mpv", ["--no-video", `--volume=${Math.round(vol * 100)}`, ...(startOffset > 0 ? [`--start=${startOffset}`] : [])]],
@@ -227,16 +231,18 @@ function selectTrack(tracks, selector) {
   return tracks.find((track) => track.id.startsWith(needle) || `${track.title} ${track.artist} ${track.album}`.toLowerCase().includes(needle));
 }
 
-export async function playTrack(track, volume = 1, startOffset = 0) {
-  const player = playerCommand(volume, startOffset);
+export async function playTrack(track, options = 1, startOffset = 0) {
+  const { quiet = false, mixer, volume = 1 } = typeof options === "number" ? { volume: options } : options;
+  const player = playerCommand(volume, startOffset, Boolean(mixer));
   if (!player) throw new Error("Install mpv, VLC (cvlc), or FFmpeg (ffplay) to play audio on Linux.");
   await stopPreviousPlayback();
-  console.log(`${accent("▶")} ${track.title} ${dim(`— ${track.artist}`)}`);
+  if (!quiet) console.log(`${accent("▶")} ${track.title} ${dim(`— ${track.artist}`)}`);
   let sourcePath = track.path;
   if (player.command === "afplay" && startOffset > 0) {
     sourcePath = sliceTrackForAfplay(track.path, startOffset);
   }
-  const child = spawn(player.command, [...player.baseArgs, sourcePath], { stdio: "inherit" });
+  const child = mixer ? await mixer.launch(player, sourcePath, "song", quiet ? "ignore" : "inherit")
+    : spawn(player.command, [...player.baseArgs, sourcePath], { stdio: quiet ? "ignore" : "inherit" });
   await writeFile(playbackLockPath, `${child.pid}\n`, "utf8");
   child.once("exit", () => { void releasePlaybackLock(child.pid); });
   return child;
@@ -412,9 +418,9 @@ export function buildSfxCueWav(cueType = 1) {
   return wav;
 }
 
-export async function playRemixNote(keyOrIndex, synthMode = false, volume = 1.0, sfx = {}) {
+export async function playRemixNote(keyOrIndex, synthMode = false, volume = 1.0, sfx = {}, mixer) {
   if (volume <= 0.001) return;
-  const player = playerCommand(volume);
+  const player = playerCommand(volume, 0, Boolean(mixer));
   if (!player) return;
   let frequency = 440;
   if (typeof keyOrIndex === "number") {
@@ -433,12 +439,13 @@ export async function playRemixNote(keyOrIndex, synthMode = false, volume = 1.0,
     await writeFile(tonePath, wav);
     remixTonePaths.set(cacheKey, tonePath);
   }
-  spawn(player.command, [...player.baseArgs, tonePath], { stdio: "ignore" });
+  if (mixer) await mixer.launch(player, tonePath, "remix");
+  else spawn(player.command, [...player.baseArgs, tonePath], { stdio: "ignore" });
 }
 
-export async function playSfxCue(cueType, volume = 1.0) {
+export async function playSfxCue(cueType, volume = 1.0, mixer) {
   if (volume <= 0.001) return;
-  const player = playerCommand(volume);
+  const player = playerCommand(volume, 0, Boolean(mixer));
   if (!player) return;
   const cacheKey = `sfx-cue-${cueType}`;
   let cuePath = remixTonePaths.get(cacheKey);
@@ -447,7 +454,8 @@ export async function playSfxCue(cueType, volume = 1.0) {
     await writeFile(cuePath, buildSfxCueWav(cueType));
     remixTonePaths.set(cacheKey, cuePath);
   }
-  spawn(player.command, [...player.baseArgs, cuePath], { stdio: "ignore" });
+  if (mixer) await mixer.launch(player, cuePath, "remix");
+  else spawn(player.command, [...player.baseArgs, cuePath], { stdio: "ignore" });
 }
 
 async function packageVersion() {
@@ -478,9 +486,9 @@ function waveform(tick, active, width) {
 function formatPianoDeck(width, isShift, lastNote, sfx, trackVol, overlayVol) {
   const songPct = `${Math.round(trackVol * 100)}%`;
   const synthPct = `${Math.round(overlayVol * 100)}%`;
-  const sfx1 = sfx.echo ? accent("[1] ECHO: ON") : dim("[1] ECHO: OFF");
-  const sfx2 = sfx.chorus ? accent("[2] CHORUS: ON") : dim("[2] CHORUS: OFF");
-  const sfx3 = sfx.lofi ? accent("[3] LO-FI: ON") : dim("[3] LO-FI: OFF");
+  const sfx1 = sfx.echo ? accent("[5] ECHO: ON") : dim("[5] ECHO: OFF");
+  const sfx2 = sfx.chorus ? accent("[6] CHORUS: ON") : dim("[6] CHORUS: OFF");
+  const sfx3 = sfx.lofi ? accent("[7] LO-FI: ON") : dim("[7] LO-FI: OFF");
 
   const lastNoteAge = lastNote ? Date.now() - lastNote.time : Infinity;
   const isRecent = lastNoteAge < 2500;
@@ -501,17 +509,16 @@ function formatPianoDeck(width, isShift, lastNote, sfx, trackVol, overlayVol) {
     `│ ${dim("SHARPS   :")}    ${accent("[W:C#4]")} ${accent("[E:D#4]")}       ${accent("[T:F#4]")} ${accent("[Y:G#4]")} ${accent("[U:A#4]")}       ${accent("[O:C#5]")} ${accent("[P:D#5]")}  │`,
     `│ ${dim("NATURALS :")} ${tint("38;5;252", "[A:C4]")}  ${tint("38;5;252", "[S:D4]")}  ${tint("38;5;252", "[D:E4]")}  ${tint("38;5;252", "[F:F4]")}  ${tint("38;5;252", "[G:G4]")}  ${tint("38;5;252", "[H:A4]")}  ${tint("38;5;252", "[J:B4]")}  ${tint("38;5;252", "[K:C5]")}  ${tint("38;5;252", "[L:D5]")} │`,
     `│ ${dim("BASS     :")} ${tint("38;5;245", "[Z:C3]")}  ${tint("38;5;245", "[X:D3]")}  ${tint("38;5;245", "[C:E3]")}  ${tint("38;5;245", "[V:F3]")}  ${tint("38;5;245", "[B:G3]")}  ${tint("38;5;245", "[N:A3]")}  ${tint("38;5;245", "[M:B3]")}                │`,
-    `├─ ${dim("SFX TOGGLES (1-3):")} ${sfx1}   ${sfx2}   ${sfx3} ${dim(border.slice(48))}┤`,
-    `│ ${accent("MIX:")} Song [ / ]: ${songPct}  ·  Synth - / +: ${synthPct}   ${dim("│")}  ${modeBadge}  ${dim("·")}  ${lastNoteText} │`,
+    `├─ ${dim("SFX TOGGLES (5-7):")} ${sfx1}   ${sfx2}   ${sfx3} ${dim(border.slice(48))}┤`,
+    `│ ${accent("MIX:")} Song 1 / 2: ${songPct}  ·  Synth 3 / 4: ${synthPct}   ${dim("│")}  ${modeBadge}  ${dim("·")}  ${lastNoteText} │`,
     `${accent("└")}${dim(border)}${accent("┘")}`
   ].join("\n");
 }
 
 async function tui() {
   const library = await loadLibrary();
-  const tracks = library.tracks;
+  let tracks = library.tracks;
   if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error("tui needs an interactive terminal. Use `ahoy library` in a piped shell.");
-  if (!tracks.length) { console.log("No tracks yet. Run: ahoy scan ~/Music"); return; }
   let selected = 0;
   let child = null;
   let currentTrack = null;
@@ -519,44 +526,108 @@ async function tui() {
   let closed = false;
   let paused = false;
   let remixMode = false;
-  let trackVolume = 0.8;
-  let overlayVolume = 1.0;
-  let sfxEcho = false;
-  let sfxChorus = false;
-  let sfxLoFi = false;
-  let lastNote = null;
-  let trackStartTime = null;
-  let trackElapsed = 0;
-  let volumeDebounceTimer = null;
-
+  let sfxEcho = false, sfxChorus = false, sfxLoFi = false, lastNote = null;
+  let terminalMode = false;
+  const mixer = new AudioMixer();
+  let motion = process.env.AHOY_REDUCED_MOTION !== "1";
+  let discFrame = 0;
+  const mixerLine = () => `MIX  master ${mixer.levels.master}% [8/9]  song ${mixer.levels.song}% [1/2]  remix ${mixer.levels.remix}% [3/4]`;
+  const mixHelp = () => mixer.status || `${remixMode ? `REMIX · Shift synth · Esc exit · 5 echo ${sfxEcho ? "on" : "off"} / 6 chorus ${sfxChorus ? "on" : "off"} / 7 lo-fi ${sfxLoFi ? "on" : "off"}` : `m remix · z motion ${motion ? "on" : "off"}`}${loadingSince && performance.now() - loadingSince >= 1000 ? " · Rendering artwork…" : ""}`;
+  let emptyStatus = "Your library is ready for its first track.";
+  let scanning = false;
+  let ascii = process.env.AHOY_ASCII === "1" || !/utf-?8/i.test(process.env.LC_ALL || process.env.LC_CTYPE || process.env.LANG || "UTF-8");
+  let artWorker, artKey = "", artId = 0, artwork = null, artMetadata = {}, artMessage = "", loadingSince = 0;
+  let startedAt = 0, elapsedBeforePause = 0, focus = -1, launching = false;
+  const elapsed = () => elapsedBeforePause + (child && !paused ? (performance.now() - startedAt) / 1000 : 0);
+  const requestArt = (track, columns) => {
+    const key = `${track.path}:${columns}`;
+    if (key === artKey) return;
+    artKey = key; artwork = null; artMetadata = {}; artMessage = ""; loadingSince = performance.now();
+    if (!artWorker) {
+      artWorker = new Worker(new URL("./artwork-worker.mjs", import.meta.url));
+      artWorker.on("message", (result) => {
+        if (closed || result.id !== artId) return;
+        artwork = result.art; artMetadata = result.metadata ?? {}; artMessage = result.message ?? ""; loadingSince = 0; render();
+      });
+      artWorker.on("error", () => { loadingSince = 0; artMessage = "Artwork worker unavailable · press v for the deck."; render(); });
+    }
+    artWorker.postMessage({ id: ++artId, path: track.path, columns });
+  };
+  const renderTerminal = (track, active) => {
+    const width = Math.max(16, (process.stdout.columns || 80) - 2), height = process.stdout.rows || 24;
+    const queueRows = Math.min(tracks.length, height < 32 ? 1 : 5);
+    const columns = artColumns(width, height - (width < 64 ? 6 : 3) - queueRows);
+    requestArt(track, columns);
+    const lines = [];
+    const textLine = (value) => crop(terminalText(value), width);
+    lines.push(accent("AHOY / LIVE DECK"), dim(textLine("↑↓ select · enter play · space pause · v waveform · x quit")), dim("═".repeat(width)),
+      accent(active ? "▶  NOW PLAYING" : paused ? "Ⅱ  PAUSED" : "○  READY"));
+    const artLines = artwork?.[ascii ? "ascii" : "braille"];
+    if (artLines) lines.push(...artLines.map(textLine));
+    else {
+      lines.push(...spinningDisc(Math.min(40, width), Math.max(2, columns / 2), discFrame)[ascii ? "ascii" : "braille"]);
+    }
+    const tags = artMetadata.tags ?? {};
+    const duration = Number(artMetadata.duration) || (track.duration_ms ? track.duration_ms / 1000 : NaN);
+    const position = currentTrack ? Math.min(elapsed(), Number.isFinite(duration) ? duration : Infinity) : 0;
+    const barWidth = Math.max(8, Math.min(50, width - 4));
+    const filled = Number.isFinite(duration) ? Math.min(barWidth, Math.floor(position / duration * barWidth)) : 0;
+    const buttons = ["[ Previous", active ? "Space Pause" : "Space Play", "] Next", "v Waveform"];
+    const buttonLabels = buttons.map((label, index) => focus === index ? `>${label}<` : label);
+    const controlLines = width < 64 ? buttonLabels.map(textLine) : [textLine(buttonLabels.join("  "))];
+    lines.push("", accent(textLine((tags.title || track.title).toUpperCase())), dim(textLine(`${tags.artist || track.artist} · ${tags.album || track.album}`)),
+      textLine(`${clockLabel(position)} / ${clockLabel(duration)}  ${active ? "PLAYING" : paused ? "PAUSED" : "READY"}`),
+      textLine(`[${"=".repeat(filled)}${"-".repeat(barWidth - filled)}]`),
+      ...controlLines,
+      dim(textLine("Tab focus · Enter activate · b Braille/ASCII")),
+      textLine(mixerLine()), dim(textLine(mixHelp())), dim("─".repeat(width)));
+    const start = Math.max(0, Math.min(selected - Math.floor(queueRows / 2), tracks.length - queueRows));
+    tracks.slice(start, start + queueRows).forEach((item, offset) => {
+      const index = start + offset;
+      const marker = index === selected ? ">" : " ";
+      const playing = active && currentTrack?.id === item.id ? ">" : " ";
+      lines.push(textLine(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${item.title} — ${item.artist}`));
+    });
+    lines.push(dim(textLine(`${tracks.length} local tracks · ${libraryPath}`)));
+    // Artwork is static; only the missing-cover CD animates during playback.
+    process.stdout.write(`\x1b[0m\x1b[H${lines.slice(0, Math.max(1, height - 1)).map((line) => `${line}\x1b[K`).join("\n")}\x1b[J`);
+  };
   const render = () => {
     if (closed) return;
-    clearScreen();
+    if (!tracks.length) {
+      const width = Math.max(1, (process.stdout.columns || 80) - 2);
+      const height = process.stdout.rows || 24;
+      const lines = [
+        "AHOY / LIVE DECK", "═".repeat(width),
+        "Welcome aboard.", "No music yet. You're in the right place.", "",
+        emptyStatus, "", "s  Scan ~/Music", "r  Reload library",
+        "Or add another folder from your shell:", 'ahoy scan "/path/to/music"', "",
+        "Playback will be available once you add music.", mixerLine(), "v  Switch view    x  Quit"
+      ].map(line => crop(terminalText(line), width));
+      lines[0] = accent(lines[0]);
+      lines[1] = dim(lines[1]);
+      process.stdout.write(`\x1b[0m\x1b[H${lines.slice(0, Math.max(1, height - 1)).map(line => `${line}\x1b[K`).join("\n")}\x1b[J`);
+      return;
+    }
     const active = Boolean(child && !child.killed && !paused);
     const track = currentTrack ?? tracks[selected];
-    const width = Math.max(82, Math.min(104, (process.stdout.columns || 88) - 6));
-    const songPct = `${Math.round(trackVolume * 100)}%`;
-    const synthPct = `${Math.round(overlayVolume * 100)}%`;
-
-    if (remixMode) {
-      console.log(`${accent("AHOY / REMIX DECK")}${dim("  [esc/m] deck · space pause · [ / ] song vol · - / + synth vol · 1-3 sfx")}`);
-    } else {
-      console.log(`${accent("AHOY / LIVE DECK")}${dim("  ↑↓ select · enter play · space pause · [ / ] song vol · m remix · x quit")}`);
-    }
+    if (terminalMode) { renderTerminal(track, active); return; }
+    process.stdout.write("\x1b[0m");
+    clearScreen();
+    const width = Math.max(54, Math.min(104, (process.stdout.columns || 86) - 8));
+    requestArt(track, artColumns(width, (process.stdout.rows || 24) - 5));
+    console.log(`${accent("AHOY / LIVE DECK")}${dim("  ↑↓ select · enter play · space pause · m remix · v Terminal Art · x quit")}`);
     console.log(dim("═".repeat(width)));
     console.log(`${accent(active ? "▶  NOW PLAYING" : paused ? "Ⅱ  PAUSED" : "○  READY")}  ${dim("ONE MUSIC TRACK · LOCAL OUTPUT")}`);
     console.log(`${accent(crop(track.title.toUpperCase(), width - 2))}`);
     console.log(dim(`${crop(track.artist, Math.floor(width / 2))}  ·  ${crop(track.album, Math.floor(width / 2) - 5)}`));
-    console.log(`\n${accent(waveform(tick, active, width))}`);
-    console.log(`${dim("▔".repeat(width))}  ${dim(active ? `PLAYING · SONG VOL ${songPct}` : paused ? "PAUSED — SPACE TO RESUME" : "ENTER TO PLAY")}`);
-
-    if (remixMode) {
-      const sfx = { echo: sfxEcho, chorus: sfxChorus, lofi: sfxLoFi };
-      console.log(formatPianoDeck(width, false, lastNote, sfx, trackVolume, overlayVolume));
-    } else {
-      console.log(dim(`Press M for QWERTY piano remix deck · Song Vol [ / ]: ${songPct} · Synth Vol - / +: ${synthPct}`));
-    }
-
+    if (!artwork) console.log(spinningDisc(Math.min(40, width), 5, discFrame)[ascii ? "ascii" : "braille"].join("\n"));
+    else console.log(`\n${accent(waveform(tick, active && motion, width))}`);
+    console.log(`${dim("▔".repeat(width))}  ${dim(active ? "PLAYING" : paused ? "PAUSED — SPACE TO RESUME" : "ENTER TO PLAY")}`);
+    if (remixMode) console.log(formatPianoDeck(width, false, lastNote, { echo: sfxEcho, chorus: sfxChorus, lofi: sfxLoFi }, mixer.levels.song / 100, mixer.levels.remix / 100));
+    else console.log(dim("Press M for QWERTY piano remix notes over this track"));
+    console.log(mixerLine());
+    console.log(dim(mixHelp()));
     console.log(dim("─".repeat(width)));
     const start = Math.max(0, Math.min(selected - 2, tracks.length - 5));
     tracks.slice(start, start + 5).forEach((item, offset) => {
@@ -569,149 +640,98 @@ async function tui() {
   };
 
   const stop = () => {
+    mixer.stopRemix(); mixer.paused = false;
     if (child && !child.killed) { if (paused) child.kill("SIGCONT"); child.kill(); }
-    child = null; currentTrack = null; paused = false; trackStartTime = null; trackElapsed = 0;
+    child = null; currentTrack = null; paused = false; remixMode = false;
+    elapsedBeforePause = 0;
   };
 
   const pauseOrResume = () => {
     if (!child || child.killed) return;
-    if (!paused) {
-      trackElapsed += (Date.now() - (trackStartTime || Date.now())) / 1000;
-      trackStartTime = null;
-      child.kill("SIGSTOP");
-      paused = true;
-    } else {
-      trackStartTime = Date.now();
-      child.kill("SIGCONT");
-      paused = false;
-    }
+    if (!paused) elapsedBeforePause = elapsed(); else startedAt = performance.now();
+    child.kill(paused ? "SIGCONT" : "SIGSTOP");
+    paused = !paused;
+    mixer.paused = paused;
+    if (!paused) void mixer.apply();
   };
-
-  const applyTrackVolume = async () => {
-    if (!child || child.killed || paused || !currentTrack) return;
-    const elapsed = trackStartTime ? (Date.now() - trackStartTime) / 1000 : 0;
-    const currentOffset = trackElapsed + elapsed;
-    if (child && !child.killed) child.kill();
+  const startSelected = async () => {
+    if (launching || !tracks[selected]) return;
+    launching = true;
+    stop(); currentTrack = tracks[selected];
     try {
-      child = await playTrack(currentTrack, trackVolume, currentOffset);
-      trackStartTime = Date.now();
-      trackElapsed = currentOffset;
-      child.on("exit", () => {
-        child = null; currentTrack = null; paused = false; trackStartTime = null; trackElapsed = 0; render();
-      });
-    } catch (err) {
-      console.error(err.message);
-    }
+      const playingChild = await playTrack(currentTrack, { quiet: true, mixer });
+      if (closed) { playingChild.kill(); return; }
+      child = playingChild; startedAt = performance.now();
+      const finish = () => { if (child !== playingChild) return; child = null; currentTrack = null; paused = false; remixMode = false; elapsedBeforePause = 0; render(); };
+      child.once("exit", finish); child.once("error", finish);
+    } catch (error) { currentTrack = null; artMessage = terminalText(error.message); }
+    finally { launching = false; }
   };
-
-  const triggerVolumeUpdate = () => {
-    if (volumeDebounceTimer) clearTimeout(volumeDebounceTimer);
-    volumeDebounceTimer = setTimeout(() => { void applyTrackVolume(); }, 80);
-  };
-
+  const skip = async (offset) => { selected = Math.max(0, Math.min(tracks.length - 1, (currentTrack ? tracks.indexOf(currentTrack) : selected) + offset)); await startSelected(); };
   render();
-  const animation = setInterval(() => { tick += 1; render(); }, 180);
+  let lastTerminalSecond = -1;
+  const animation = setInterval(() => {
+    tick += 1;
+    if (motion && child && !child.killed && !paused) discFrame = (discFrame + 1) % 24;
+    if (!tracks.length) return;
+    if (!terminalMode || (!artwork && motion && child && !paused) || Math.floor(performance.now() / 1000) !== lastTerminalSecond) { lastTerminalSecond = Math.floor(performance.now() / 1000); render(); }
+  }, 180);
+  const resize = () => render();
+  process.stdout.on("resize", resize);
   process.stdin.setRawMode(true); process.stdin.resume();
 
   await new Promise((done) => process.stdin.on("data", async (key) => {
     const value = key.toString();
-
-    // Ctrl+C exits always; q and x exit only when not in remix mode
-    if (value === "\u0003" || (!remixMode && (value === "x" || value === "q"))) {
-      closed = true; clearInterval(animation); stop(); process.stdin.setRawMode(false); process.stdin.pause(); clearScreen(); done(); return;
+    if (value === "\u0003" || (!remixMode && (value === "x" || value === "q"))) { closed = true; clearInterval(animation); stop(); mixer.close(); void artWorker?.terminate(); process.stdout.off("resize", resize); process.stdin.setRawMode(false); process.stdin.pause(); process.stdout.write("\x1b[0m"); clearScreen(); done(); return; }
+    if (mixer.adjust(value)) { render(); return; }
+    if (value === "\u001b") { remixMode = false; render(); return; }
+    if (!remixMode && value === "z") motion = !motion;
+    if (!remixMode && value === "v") { terminalMode = !terminalMode; focus = -1; }
+    if (!tracks.length) {
+      if ((value === "s" || value === "r") && !scanning) {
+        scanning = true; emptyStatus = value === "s" ? "Scanning ~/Music…" : "Reloading library…"; render();
+        try {
+          if (value === "s") await scanDirectories([join(homedir(), "Music")]);
+          tracks = (await loadLibrary()).tracks; selected = 0;
+          emptyStatus = "No MP3s found yet. Try another folder, then reload.";
+        } catch (error) { emptyStatus = terminalText(error.message); }
+        finally { scanning = false; }
+      }
+      render(); return;
     }
-
-    // Escape exits remix mode
-    if (value === "\u001b") {
-      if (remixMode) { remixMode = false; render(); }
-      return;
-    }
-
-    // Toggle remix mode with 'm' (or 'M' when outside remix mode)
-    if (!remixMode && (value === "m" || value === "M")) {
-      remixMode = true; render(); return;
-    }
-    if (remixMode && value === "m") {
-      remixMode = false; render(); return;
-    }
-
-    // Track navigation
+    if (!remixMode && value === "b") ascii = !ascii;
+    if (terminalMode && value === "\t") focus = (focus + 1) % 4;
+    if (terminalMode && value === "\u001b[Z") focus = (focus + 3) % 4;
+    if (value === "\u001b[A" || value === "\u001b[B") focus = -1;
     if (value === "\u001b[A" || (!remixMode && value === "k")) selected = Math.max(0, selected - 1);
     if (value === "\u001b[B" || (!remixMode && value === "j")) selected = Math.min(tracks.length - 1, selected + 1);
-
-    // Transport: space to pause/resume
-    if (value === " ") pauseOrResume();
-
-    // Transport: enter to play selected track
+    if (value === " ") { if (terminalMode && !child) await startSelected(); else pauseOrResume(); }
+    if (value === "m" || (!remixMode && value === "M")) { remixMode = !remixMode; render(); return; }
+    const alias = { "-": "3", "_": "3", "+": "4", "=": "4", "\u001b[D": "1", "\u001b[C": "2" }[value];
+    if (alias) { mixer.adjust(alias); render(); return; }
+    if (!terminalMode && (value === "[" || value === "]")) { mixer.adjust(value === "[" ? "1" : "2"); render(); return; }
+    if (["5", "6", "7"].includes(value)) {
+      if (value === "5") sfxEcho = !sfxEcho;
+      if (value === "6") sfxChorus = !sfxChorus;
+      if (value === "7") sfxLoFi = !sfxLoFi;
+      void playSfxCue(Number(value) - 4, 1, mixer).catch(error => { mixer.status = terminalText(error.message); render(); });
+      render(); return;
+    }
+    if (remixMode && !paused && pianoKeyMap[value.toLowerCase()]) {
+      const letter = value.toLowerCase(), synth = value !== letter;
+      lastNote = { key: value, note: pianoKeyMap[letter].note, synth, time: Date.now() };
+      void playRemixNote(letter, synth, 1, { echo: sfxEcho, chorus: sfxChorus, lofi: sfxLoFi }, mixer).catch(error => { mixer.status = terminalText(error.message); render(); });
+      render(); return;
+    }
+    if (terminalMode && value === "[") await skip(-1);
+    if (terminalMode && value === "]") await skip(1);
     if (value === "\r") {
-      stop(); currentTrack = tracks[selected];
-      try {
-        trackStartTime = Date.now(); trackElapsed = 0;
-        child = await playTrack(currentTrack, trackVolume, 0);
-        child.on("exit", () => { child = null; currentTrack = null; paused = false; trackStartTime = null; trackElapsed = 0; render(); });
-      } catch (error) {
-        currentTrack = null; console.error(error.message);
-      }
+      if (!terminalMode || focus < 0) await startSelected();
+      else if (focus === 0) await skip(-1);
+      else if (focus === 1) { if (child) pauseOrResume(); else await startSelected(); }
+      else if (focus === 2) await skip(1);
+      else { terminalMode = false; focus = -1; }
     }
-
-    // Mixing controls: Song volume
-    if (value === "[" || value === "\u001b[D") {
-      trackVolume = Math.max(0, Math.round((trackVolume - 0.1) * 10) / 10);
-      triggerVolumeUpdate();
-      render(); return;
-    }
-    if (value === "]" || value === "\u001b[C") {
-      trackVolume = Math.min(1.5, Math.round((trackVolume + 0.1) * 10) / 10);
-      triggerVolumeUpdate();
-      render(); return;
-    }
-
-    // Mixing controls: Synth / Overlay volume
-    if (value === "-" || value === "_") {
-      overlayVolume = Math.max(0, Math.round((overlayVolume - 0.1) * 10) / 10);
-      render(); return;
-    }
-    if (value === "+" || value === "=") {
-      overlayVolume = Math.min(1.5, Math.round((overlayVolume + 0.1) * 10) / 10);
-      render(); return;
-    }
-
-    // Special SFX Toggles (1-3)
-    if (value === "1") {
-      sfxEcho = !sfxEcho;
-      void playSfxCue(1, overlayVolume);
-      render(); return;
-    }
-    if (value === "2") {
-      sfxChorus = !sfxChorus;
-      void playSfxCue(2, overlayVolume);
-      render(); return;
-    }
-    if (value === "3") {
-      sfxLoFi = !sfxLoFi;
-      void playSfxCue(3, overlayVolume);
-      render(); return;
-    }
-
-    // Remix notes (A-Z, with Shift triggering synth mode with reverby delay)
-    if (remixMode) {
-      const isShift = value >= "A" && value <= "Z";
-      const letter = value.toLowerCase();
-      if (pianoKeyMap[letter]) {
-        const noteInfo = pianoKeyMap[letter];
-        lastNote = {
-          key: isShift ? letter.toUpperCase() : letter,
-          note: noteInfo.note,
-          synth: isShift,
-          time: Date.now()
-        };
-        const sfx = { echo: sfxEcho, chorus: sfxChorus, lofi: sfxLoFi };
-        void playRemixNote(letter, isShift, overlayVolume, sfx);
-        render();
-        return;
-      }
-    }
-
     render();
   }));
 }
@@ -727,9 +747,9 @@ export async function main(args = process.argv.slice(2)) {
   if (["--version", "-v", "version"].includes(command)) return console.log(await packageVersion());
   if (command === "update") return update();
   if (command === "scan") {
-    if (!rest.length) throw new Error("Choose at least one folder, for example: ahoy scan ~/Music");
-    const result = await scanDirectories(rest);
+    const result = await scanDirectories(rest.length ? rest : [join(homedir(), "Music")]);
     console.log(`${accent("Library updated")} · ${result.added} added, ${result.updated} refreshed, ${result.total} total`);
+    if (!result.total && process.stdin.isTTY && process.stdout.isTTY) return tui();
     return;
   }
   if (command === "rescan") {
