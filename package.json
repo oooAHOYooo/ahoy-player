@@ -1,7 +1,7 @@
 {
   "name": "ahoy-player",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.2",
   "description": "Local-first Ahoy Player with a native Rust GUI and native CLI/TUI.",
   "workspaces": [
     "apps/*",
