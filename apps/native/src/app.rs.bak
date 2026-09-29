@@ -161,16 +161,6 @@ pub fn run() -> Result<()> {
         }
     });
 
-    let weak = window.as_weak(); let state_dismiss = state.clone();
-    window.on_dismiss_welcome(move || {
-        if let Some(window) = weak.upgrade() {
-            let mut state = state_dismiss.borrow_mut();
-            state.auth.welcome_dismissed = true;
-            let _ = crate::auth::save(&state.data_dir.join("auth.json"), &state.auth);
-            window.set_show_welcome_modal(false);
-        }
-    });
-
     window.run()?;
     Ok(())
 }

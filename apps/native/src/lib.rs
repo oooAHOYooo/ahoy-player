@@ -5,3 +5,4 @@ pub mod layouts;
 pub mod library;
 pub mod metadata;
 pub mod themes;
+pub mod auth;

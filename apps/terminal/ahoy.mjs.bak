@@ -28,8 +28,6 @@ const tint = (code, value) => useColor ? `\x1b[${code}m${value}\x1b[0m` : value;
 const accent = (value) => tint("38;5;156", value);
 const dim = (value) => tint("2", value);
 
-let ahoyId = await getAhoyId();
-
 export const pianoKeyMap = {
   // Top row: Sharps/black keys aligned above naturals + edge accents
   q: { note: "A#3", frequency: 233.08, label: "A#3", row: "top", type: "accent" },
@@ -564,8 +562,7 @@ async function tui() {
     requestArt(track, columns);
     const lines = [];
     const textLine = (value) => crop(terminalText(value), width);
-    const deckHeader = ahoyId ? `AHOY / LIVE DECK — ⚓ AHOY ID: ${ahoyId}` : "AHOY / LIVE DECK";
-    lines.push(accent(deckHeader), dim(textLine("↑↓ select · enter play · space pause · v waveform · x quit")), dim("═".repeat(width)),
+    lines.push(accent("AHOY / LIVE DECK"), dim(textLine("↑↓ select · enter play · space pause · v waveform · x quit")), dim("═".repeat(width)),
       accent(active ? "▶  NOW PLAYING" : paused ? "Ⅱ  PAUSED" : "○  READY"));
     const artLines = artwork?.[ascii ? "ascii" : "braille"];
     if (artLines) lines.push(...artLines.map(textLine));
@@ -602,13 +599,10 @@ async function tui() {
     if (!tracks.length) {
       const width = Math.max(1, (process.stdout.columns || 80) - 2);
       const height = process.stdout.rows || 24;
-      const deckHeader = ahoyId ? `AHOY / LIVE DECK — ⚓ AHOY ID: ${ahoyId}` : "AHOY / LIVE DECK";
-      const welcomeLine = ahoyId ? `Welcome back, ${ahoyId}.` : "Welcome aboard.";
       const lines = [
-        deckHeader, "═".repeat(width),
-        welcomeLine, "No music yet. You're in the right place.", "",
+        "AHOY / LIVE DECK", "═".repeat(width),
+        "Welcome aboard.", "No music yet. You're in the right place.", "",
         emptyStatus, "", "s  Scan ~/Music", "r  Reload library",
-        ahoyId ? "l  Sign out" : "l  Sign in to AHOY ID",
         "Or add another folder from your shell:", 'ahoy scan "/path/to/music"', "",
         "Playback will be available once you add music.", mixerLine(), "v  Switch view    x  Quit"
       ].map(line => crop(terminalText(line), width));
@@ -624,8 +618,7 @@ async function tui() {
     clearScreen();
     const width = Math.max(54, Math.min(104, (process.stdout.columns || 86) - 8));
     requestArt(track, artColumns(width, (process.stdout.rows || 24) - 5));
-    const deckHeader = ahoyId ? `AHOY / LIVE DECK — ⚓ AHOY ID: ${ahoyId}` : "AHOY / LIVE DECK";
-    console.log(`${accent(deckHeader)}${dim("  ↑↓ select · enter play · space pause · m remix · v Terminal Art · x quit · l login/logout")}`);
+    console.log(`${accent("AHOY / LIVE DECK")}${dim("  ↑↓ select · enter play · space pause · m remix · v Terminal Art · x quit")}`);
     console.log(dim("═".repeat(width)));
     console.log(`${accent(active ? "▶  NOW PLAYING" : paused ? "Ⅱ  PAUSED" : "○  READY")}  ${dim("ONE MUSIC TRACK · LOCAL OUTPUT")}`);
     console.log(`${accent(crop(track.title.toUpperCase(), width - 2))}`);
@@ -696,22 +689,6 @@ async function tui() {
     if (value === "\u001b") { remixMode = false; render(); return; }
     if (!remixMode && value === "z") motion = !motion;
     if (!remixMode && value === "v") { terminalMode = !terminalMode; focus = -1; }
-    if (!remixMode && value === "l") {
-      if (ahoyId) {
-        await logout();
-        ahoyId = null;
-        emptyStatus = "Logged out.";
-      } else {
-        emptyStatus = "Waiting for browser login..."; render();
-        try {
-          ahoyId = await startLoginFlow();
-          emptyStatus = "Logged in successfully.";
-        } catch (e) {
-          emptyStatus = "Login failed: " + e.message;
-        }
-      }
-      render(); return;
-    }
     if (!tracks.length) {
       if ((value === "s" || value === "r") && !scanning) {
         scanning = true; emptyStatus = value === "s" ? "Scanning ~/Music…" : "Reloading library…"; render();
@@ -796,21 +773,6 @@ export async function main(args = process.argv.slice(2)) {
     const track = selectTrack(library.tracks, rest.join(" "));
     if (!track) throw new Error("Track not found. Run `ahoy library` or `ahoy search <words>` first.");
     await playTrack(track);
-    return;
-  }
-  if (command === "login") {
-    console.log(accent("Starting AHOY ID login..."));
-    try {
-      const id = await startLoginFlow(true);
-      console.log(`\nSuccessfully logged in as ${accent(id)}!`);
-    } catch (e) {
-      console.error("\nLogin failed:", e.message);
-    }
-    return;
-  }
-  if (command === "logout") {
-    await logout();
-    console.log("Logged out of AHOY ID.");
     return;
   }
   if (command === "player" || command === "tui") return tui();

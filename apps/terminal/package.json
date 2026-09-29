@@ -37,5 +37,8 @@
     "start": "node ./ahoy.mjs",
     "typecheck": "node --check ./ahoy.mjs && node --check ./terminal-art.mjs && node --check ./artwork-worker.mjs && node --check ./audio-mixer.mjs",
     "test": "node --test ./test/*.node-test.mjs"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0"
   }
 }
