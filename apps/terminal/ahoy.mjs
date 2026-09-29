@@ -702,9 +702,11 @@ async function tui() {
         ahoyId = null;
         emptyStatus = "Logged out.";
       } else {
-        emptyStatus = "Waiting for browser login..."; render();
+        process.stdout.write("\x1b[0m");
+        clearScreen();
+        console.log(accent("Starting AHOY ID login..."));
         try {
-          ahoyId = await startLoginFlow();
+          ahoyId = await startLoginFlow(true);
           emptyStatus = "Logged in successfully.";
         } catch (e) {
           emptyStatus = "Login failed: " + e.message;
