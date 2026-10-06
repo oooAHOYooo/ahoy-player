@@ -3,7 +3,7 @@ post_install() {
 Ahoy Player installed.
 
   ahoy player   open the terminal player
-  ahoy scan ~/Music
+  ahoy scan   scan Music or find your music folders automatically
   ahoy --help
 
 Install mpv or ffplay if you want terminal audio playback.

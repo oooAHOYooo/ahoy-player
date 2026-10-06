@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, realpathSync } from "node:fs";
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { constants as fsConstants, existsSync, realpathSync } from "node:fs";
+import { access, copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir, platform, tmpdir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
+import { createInterface } from "node:readline/promises";
 import { Worker } from "node:worker_threads";
-import { artColumns, clockLabel, terminalText, spinningDisc } from "./terminal-art.mjs";
+import { artColumns, brailleMask, clockLabel, terminalText, spinningDisc } from "./terminal-art.mjs";
 import { getAhoyId, startLoginFlow, logout } from "./auth.mjs";
 
 import { AudioMixer } from "./audio-mixer.mjs";
@@ -29,6 +30,47 @@ const accent = (value) => tint("38;5;156", value);
 const dim = (value) => tint("2", value);
 
 let ahoyId = await getAhoyId();
+
+async function keyboardBacklightStatus() {
+  if (platform() !== "linux") return { supported: false, message: "Keyboard backlight controls are currently supported on Linux only." };
+  const leds = "/sys/class/leds";
+  let names;
+  try { names = await readdir(leds); } catch { return { supported: false, message: "Linux keyboard backlight controls were not found." }; }
+  for (const name of names.filter((entry) => /kbd_backlight/i.test(entry))) {
+    const path = join(leds, name);
+    try {
+      const [level, max] = await Promise.all([readFile(join(path, "brightness"), "utf8"), readFile(join(path, "max_brightness"), "utf8")]);
+      return { supported: true, path: join(path, "brightness"), level: Number(level.trim()), max: Number(max.trim()), device: name };
+    } catch {}
+  }
+  return { supported: false, message: "No Linux keyboard backlight control was found." };
+}
+
+async function keyboardBacklightCommand() {
+  const status = await keyboardBacklightStatus();
+  if (!status.supported) return console.log(status.message);
+  console.log(`Keyboard backlight: ${status.level}/${status.max} (${status.device}).`);
+  console.log("To enable TUI control for one session, run: AHOY_KEYBOARD_BACKLIGHT=1 ahoy player");
+  try { await access(status.path, fsConstants.W_OK); }
+  catch { console.log("This device is read-only for your user. Configure an appropriate udev permission before enabling control."); }
+}
+
+async function createBacklightControl() {
+  if (process.env.AHOY_KEYBOARD_BACKLIGHT !== "1") return null;
+  const status = await keyboardBacklightStatus();
+  if (!status.supported) return { message: status.message };
+  try { await writeFile(status.path, String(status.level)); }
+  catch { return { message: `Backlight control unavailable: ${status.device} is not writable by this user.` }; }
+  let level = status.level;
+  return {
+    get label() { return `kbd ${level}/${status.max}`; },
+    async adjust(delta) {
+      level = Math.max(0, Math.min(status.max, level + delta));
+      await writeFile(status.path, String(level));
+    },
+    async restore() { await writeFile(status.path, String(status.level)); }
+  };
+}
 
 export const pianoKeyMap = {
   // Top row: Sharps/black keys aligned above naturals + edge accents
@@ -67,6 +109,27 @@ export const pianoKeyMap = {
 export const remixKeys = Object.keys(pianoKeyMap);
 export const remixFrequencies = remixKeys.map((k) => pianoKeyMap[k].frequency);
 const remixTonePaths = new Map();
+const remixScales = [
+  { name: "Chromatic", notes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+  { name: "C Major", notes: [0, 2, 4, 5, 7, 9, 11] },
+  { name: "C Minor", notes: [0, 2, 3, 5, 7, 8, 10] },
+  { name: "C Pentatonic", notes: [0, 2, 4, 7, 9] }
+];
+const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const remixSounds = ["Triangle", "Sine", "Square"];
+function quantizeRemixFrequency(frequency, scale) {
+  const midi = Math.round(69 + 12 * Math.log2(frequency / 440));
+  const pitch = ((midi % 12) + 12) % 12;
+  const snapped = scale.notes.reduce((best, note) => {
+    const distance = Math.min((note - pitch + 12) % 12, (pitch - note + 12) % 12);
+    const bestDistance = Math.min((best - pitch + 12) % 12, (pitch - best + 12) % 12);
+    return distance < bestDistance ? note : best;
+  }, scale.notes[0]);
+  const up = (snapped - pitch + 12) % 12;
+  const down = (pitch - snapped + 12) % 12;
+  const adjusted = midi + (up < down ? up : -down);
+  return { midi: adjusted, frequency: 440 * 2 ** ((adjusted - 69) / 12), label: `${noteNames[((adjusted % 12) + 12) % 12]}${Math.floor(adjusted / 12) - 1}` };
+}
 
 export function labelsForPath(filePath) {
   const stem = basename(filePath, extname(filePath)).replace(/[_]+/g, " ").trim();
@@ -190,6 +253,66 @@ export async function rescanLibrary(directories = []) {
   return scanDirectories(roots);
 }
 
+const ignoredSearchDirectories = new Set([".cache", ".config", ".local", ".npm", ".rustup", ".var", "node_modules", "vendor"]);
+
+async function discoverMusicFolders() {
+  const home = homedir();
+  const roots = ["Music", "Downloads", "Desktop", "Documents", "Audio", "Sound", "Shared", "Public"].map((name) => join(home, name));
+  if (platform() === "darwin") roots.push("/Volumes");
+  if (platform() === "linux") {
+    roots.push("/media", "/mnt", join("/run/media", process.env.USER || ""));
+  }
+  const seen = new Set();
+  const candidates = [];
+  let visited = 0;
+  async function visit(directory, depth = 0) {
+    if (visited >= 500 || depth > 3 || seen.has(directory)) return;
+    seen.add(directory);
+    let entries;
+    try { entries = await readdir(directory, { withFileTypes: true }); } catch { return; }
+    visited += 1;
+    if (entries.some((entry) => entry.isFile() && extname(entry.name).toLowerCase() === ".mp3")) {
+      candidates.push({ path: directory, count: entries.filter((entry) => entry.isFile() && extname(entry.name).toLowerCase() === ".mp3").length });
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith(".") && !ignoredSearchDirectories.has(entry.name)) {
+        await visit(join(directory, entry.name), depth + 1);
+      }
+    }
+  }
+  for (const root of roots) await visit(root);
+  return candidates.sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
+}
+
+async function scanWizard() {
+  clearScreen();
+  console.log(accent("AHOY PLAYER  ·  SETUP 1/2"));
+  console.log(dim("Your library stays on this machine. Choose a folder to scan."));
+  console.log("\n  Searching Music, Downloads, Documents, and attached drives…");
+  const candidates = await discoverMusicFolders();
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    if (candidates.length) {
+      console.log("\n  MUSIC FOLDERS FOUND");
+      candidates.slice(0, 12).forEach((candidate, index) => console.log(`  ${index + 1}  ${candidate.path}  ·  ${candidate.count} track${candidate.count === 1 ? "" : "s"}`));
+      const answer = (await rl.question("\n  Choose a folder number, A for all, or type a path (Enter to skip): ")).trim();
+      if (!answer) return null;
+      if (/^a$/i.test(answer)) return candidates.map((candidate) => candidate.path);
+      if (/^\d+$/.test(answer) && Number(answer) >= 1 && Number(answer) <= Math.min(candidates.length, 12)) return [candidates[Number(answer) - 1].path];
+      return [resolve(answer.replace(/^~(?=$|[/\\])/, homedir()))];
+    }
+    console.log("\n  No music folders found yet. Your files stay on this machine.");
+    const answer = (await rl.question("  Enter a folder path, or press Enter to continue: ")).trim();
+    return answer ? [resolve(answer.replace(/^~(?=$|[/\\])/, homedir()))] : null;
+  } finally { rl.close(); }
+}
+
+async function scanDefaultMusic() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return scanDirectories([join(homedir(), "Music")]);
+  const folders = await scanWizard();
+  return folders?.length ? scanDirectories(folders) : { added: 0, updated: 0, total: (await loadLibrary()).tracks.length };
+}
+
 export async function installDemo(destinationDirectory = demoDirectory) {
   await mkdir(destinationDirectory, { recursive: true });
   const destination = join(destinationDirectory, "Ahoy - Demo.mp3");
@@ -198,7 +321,7 @@ export async function installDemo(destinationDirectory = demoDirectory) {
 }
 
 function printTracks(tracks) {
-  if (!tracks.length) return console.log(dim("No local MP3s yet. Run: ahoy scan ~/Music"));
+  if (!tracks.length) return console.log(dim("No local MP3s yet. Run: ahoy scan"));
   tracks.forEach((track, index) => console.log(`${accent(String(index + 1).padStart(3, " "))}  ${track.title}\n     ${dim(`${track.artist} · ${track.album}`)}`));
 }
 
@@ -214,6 +337,27 @@ function playerCommand(volume = 1, startOffset = 0, liveMix = false) {
     if (spawnSync("which", [candidate[0]], { stdio: "ignore" }).status === 0) return { command: candidate[0], baseArgs: candidate[1] };
   }
   return null;
+}
+
+const trackDurationCache = new Map();
+function probeTrackDuration(trackPath) {
+  if (trackDurationCache.has(trackPath)) return trackDurationCache.get(trackPath);
+  const duration = new Promise((resolve) => {
+    let output = "";
+    let probe;
+    try {
+      probe = spawn("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", trackPath], { stdio: ["ignore", "pipe", "ignore"] });
+    } catch { resolve(null); return; }
+    probe.stdout.setEncoding("utf8");
+    probe.stdout.on("data", (chunk) => { output += chunk; });
+    probe.once("error", () => resolve(null));
+    probe.once("close", (code) => {
+      const seconds = Number(output.trim());
+      resolve(code === 0 && Number.isFinite(seconds) && seconds > 0 ? seconds : null);
+    });
+  });
+  trackDurationCache.set(trackPath, duration);
+  return duration;
 }
 
 function sliceTrackForAfplay(trackPath, startOffset) {
@@ -290,7 +434,9 @@ export function buildToneWav(frequency, volume = 1.0, sfx = {}) {
     const seconds = index / sampleRate;
     const envelope = Math.min(1, index / 220) * Math.max(0, 1 - seconds / noteDuration);
     const phase = (seconds * frequency) % 1;
-    let triangle = 1 - 4 * Math.abs(Math.round(phase) - phase);
+    let triangle = sfx.waveform === "sine" ? Math.sin(2 * Math.PI * phase)
+      : sfx.waveform === "square" ? (phase < 0.5 ? 1 : -1)
+        : 1 - 4 * Math.abs(Math.round(phase) - phase);
     if (sfx.chorus) {
       const phase2 = (seconds * (frequency * 1.008)) % 1;
       const tri2 = 1 - 4 * Math.abs(Math.round(phase2) - phase2);
@@ -422,7 +568,7 @@ export function buildSfxCueWav(cueType = 1) {
   return wav;
 }
 
-export async function playRemixNote(keyOrIndex, synthMode = false, volume = 1.0, sfx = {}, mixer) {
+export async function playRemixNote(keyOrIndex, synthMode = false, volume = 1.0, sfx = {}, mixer, remix = {}) {
   if (volume <= 0.001) return;
   const player = playerCommand(volume, 0, Boolean(mixer));
   if (!player) return;
@@ -433,13 +579,14 @@ export async function playRemixNote(keyOrIndex, synthMode = false, volume = 1.0,
     const lower = keyOrIndex.toLowerCase();
     frequency = pianoKeyMap[lower]?.frequency || 440;
   }
+  if (remix.scale) frequency = quantizeRemixFrequency(frequency, remix.scale).frequency;
   const sfxKey = `${sfx.echo ? "1" : "0"}${sfx.chorus ? "1" : "0"}${sfx.lofi ? "1" : "0"}`;
-  const typeKey = synthMode ? `synth-${sfxKey}` : `tone-${sfxKey}`;
+  const typeKey = synthMode ? `synth-${sfxKey}` : `tone-${remix.sound || "triangle"}-${sfxKey}`;
   const cacheKey = `${typeKey}-${Math.round(frequency * 100)}`;
   let tonePath = remixTonePaths.get(cacheKey);
   if (!tonePath) {
     tonePath = join(tmpdir(), `ahoy-remix-${typeKey}-${Math.round(frequency * 100)}.wav`);
-    const wav = synthMode ? buildSynthWav(frequency, 1.0, sfx) : buildToneWav(frequency, 1.0, sfx);
+    const wav = synthMode ? buildSynthWav(frequency, 1.0, sfx) : buildToneWav(frequency, 1.0, { ...sfx, waveform: remix.sound || "triangle" });
     await writeFile(tonePath, wav);
     remixTonePaths.set(cacheKey, tonePath);
   }
@@ -477,45 +624,39 @@ async function update() {
 
 function clearScreen() { process.stdout.write("\x1b[2J\x1b[H"); }
 function crop(value, width) { return value.length > width ? `${value.slice(0, Math.max(1, width - 1))}…` : value; }
-function waveform(tick, active, width) {
-  const levels = [2, 5, 3, 7, 4, 8, 3, 6, 2, 7, 5, 8, 4, 6, 3, 7, 5, 2, 8, 4, 6, 3, 7, 5, 2, 8, 4, 6, 3, 7, 5, 2];
-  const glyphs = "▁▂▃▄▅▆▇█";
-  return Array.from({ length: width }, (_, index) => {
-    const level = levels[index % levels.length];
-    const bounce = active ? ((tick + index * 3) % 5 === 0 ? 1 : 0) : 0;
-    return glyphs[Math.min(7, level - 1 + bounce)];
-  }).join("");
+function brailleVisualizer(tick, active, width) {
+  const cells = [];
+  for (let column = 0; column < width; column += 1) {
+    const phase = active ? tick / 3 : 0;
+    const envelope = (Math.sin(column * 0.47 + phase) + Math.sin(column * 0.19 - phase * 0.7) + 2) / 4;
+    const height = active ? 1 + Math.round(envelope * 7) : 2 + Math.round(envelope * 2);
+    for (let row = 0; row < 2; row += 1) {
+      const dots = Array.from({ length: 8 }, (_, index) => {
+        const dotRow = Math.floor(index / 2), dotColumn = index % 2;
+        const level = height - row * 4 + (dotColumn === 1 && column % 3 === 0 ? -1 : 0);
+        return dotRow >= 4 - level;
+      });
+      cells[row] = (cells[row] || "") + String.fromCodePoint(0x2800 + brailleMask(dots));
+    }
+  }
+  return cells;
 }
 
-function formatPianoDeck(width, isShift, lastNote, sfx, trackVol, overlayVol) {
+function formatPianoDeck(width, lastNote, sfx, trackVol, overlayVol, scale, sound, recentAction) {
   const songPct = `${Math.round(trackVol * 100)}%`;
   const synthPct = `${Math.round(overlayVol * 100)}%`;
-  const sfx1 = sfx.echo ? accent("[5] ECHO: ON") : dim("[5] ECHO: OFF");
-  const sfx2 = sfx.chorus ? accent("[6] CHORUS: ON") : dim("[6] CHORUS: OFF");
-  const sfx3 = sfx.lofi ? accent("[7] LO-FI: ON") : dim("[7] LO-FI: OFF");
-
   const lastNoteAge = lastNote ? Date.now() - lastNote.time : Infinity;
   const isRecent = lastNoteAge < 2500;
-  const isShiftMode = isRecent ? lastNote.synth : false;
-
-  const modeBadge = isShiftMode
-    ? tint("1;38;5;220", "⚡ UPPERCASE SYNTH + DELAY")
-    : tint("38;5;156", "🎹 LOWERCASE QWERTY VIBE");
-
-  const lastNoteText = isRecent
-    ? `${accent("PLAYED:")} ${lastNote.synth ? tint("1;38;5;220", `Shift+${lastNote.key}`) : tint("38;5;156", lastNote.key)} ${dim(`(${lastNote.note})`)}`
-    : dim("PLAY: a-z vibe · Shift+A-Z synth");
-
-  const innerWidth = Math.max(80, width - 2);
-  const border = "─".repeat(innerWidth);
+  const pianoKeys = (keys) => keys.split(" ").map((key) => isRecent && lastNote.key.toLowerCase() === key.toLowerCase() ? accent(`[${key}]`) : accent(key)).join(" ");
+  const echo = sfx.echo ? accent("Echo on") : dim("Echo off");
+  const chorus = sfx.chorus ? accent("Chorus on") : dim("Chorus off");
+  const lofi = sfx.lofi ? accent("Lo-fi on") : dim("Lo-fi off");
   return [
-    `${accent("┌─ PIANO REMIX DECK")} ${dim(border.slice(19))}${accent("┐")}`,
-    `│ ${dim("SHARPS   :")}    ${accent("[W:C#4]")} ${accent("[E:D#4]")}       ${accent("[T:F#4]")} ${accent("[Y:G#4]")} ${accent("[U:A#4]")}       ${accent("[O:C#5]")} ${accent("[P:D#5]")}  │`,
-    `│ ${dim("NATURALS :")} ${tint("38;5;252", "[A:C4]")}  ${tint("38;5;252", "[S:D4]")}  ${tint("38;5;252", "[D:E4]")}  ${tint("38;5;252", "[F:F4]")}  ${tint("38;5;252", "[G:G4]")}  ${tint("38;5;252", "[H:A4]")}  ${tint("38;5;252", "[J:B4]")}  ${tint("38;5;252", "[K:C5]")}  ${tint("38;5;252", "[L:D5]")} │`,
-    `│ ${dim("BASS     :")} ${tint("38;5;245", "[Z:C3]")}  ${tint("38;5;245", "[X:D3]")}  ${tint("38;5;245", "[C:E3]")}  ${tint("38;5;245", "[V:F3]")}  ${tint("38;5;245", "[B:G3]")}  ${tint("38;5;245", "[N:A3]")}  ${tint("38;5;245", "[M:B3]")}                │`,
-    `├─ ${dim("SFX TOGGLES (5-7):")} ${sfx1}   ${sfx2}   ${sfx3} ${dim(border.slice(48))}┤`,
-    `│ ${accent("MIX:")} Song 1 / 2: ${songPct}  ·  Synth 3 / 4: ${synthPct}   ${dim("│")}  ${modeBadge}  ${dim("·")}  ${lastNoteText} │`,
-    `${accent("└")}${dim(border)}${accent("┘")}`
+    accent("✦ REMIX") + dim(` ${scale.name} · ${sound} · Tab/Esc back`),
+    width < 62 ? `${pianoKeys("Z X C V B N M")} bass · ${pianoKeys("A S D F G H J K L")} melody` : `${dim("LOW")}   ${pianoKeys("Z X C V B N M")}   ${dim("bass notes")}`,
+    ...(width < 62 ? [] : [`${dim("MID")}   ${pianoKeys("A S D F G H J K L")}   ${dim("melody")}`, `${dim("HIGH")}  ${pianoKeys("W E · T Y U · O P")}   ${dim("sharps")}`]),
+    `${dim("FX")}  5 ${echo} · 6 ${chorus} · 7 ${lofi} · [ ] scale · ; sound · 0 song mute · 9 remix mute`,
+    `${dim("Shift + key = synth")} · Song ${songPct}${sfx.mutedSong ? " MUTED" : ""} · Remix ${synthPct}${sfx.mutedRemix ? " MUTED" : ""}${isRecent ? ` · ${accent(`${lastNote.key} ${lastNote.note}`)}` : ""}${recentAction ? ` · ${accent(recentAction)}` : ""}`
   ].join("\n");
 }
 
@@ -523,25 +664,40 @@ async function tui() {
   const library = await loadLibrary();
   let tracks = library.tracks;
   if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error("tui needs an interactive terminal. Use `ahoy library` in a piped shell.");
+  const playbackReady = Boolean(playerCommand());
   let selected = 0;
   let child = null;
   let currentTrack = null;
+  let currentDuration = NaN;
   let tick = 0;
   let closed = false;
   let paused = false;
   let remixMode = false;
   let sfxEcho = false, sfxChorus = false, sfxLoFi = false, lastNote = null;
+  let remixScaleIndex = 0, remixSoundIndex = 0, recentAction = "";
   let terminalMode = false;
   const mixer = new AudioMixer();
+  const backlight = await createBacklightControl();
   let motion = process.env.AHOY_REDUCED_MOTION !== "1";
   let discFrame = 0;
   const mixerLine = () => `MIX  master ${mixer.levels.master}% [8/9]  song ${mixer.levels.song}% [1/2]  remix ${mixer.levels.remix}% [3/4]`;
-  const mixHelp = () => mixer.status || `${remixMode ? `REMIX · Shift synth · Esc exit · 5 echo ${sfxEcho ? "on" : "off"} / 6 chorus ${sfxChorus ? "on" : "off"} / 7 lo-fi ${sfxLoFi ? "on" : "off"}` : `m remix · z motion ${motion ? "on" : "off"}`}${loadingSince && performance.now() - loadingSince >= 1000 ? " · Rendering artwork…" : ""}`;
-  let emptyStatus = "Your library is ready for its first track.";
+  const channelMixLine = (width) => {
+    const bar = (level, size) => {
+      const filled = Math.round(level / 100 * size);
+      return `${"■".repeat(filled)}${"·".repeat(size - filled)}`;
+    };
+    const song = `${mixer.muted.song ? "×" : bar(mixer.levels.song, width < 62 ? 5 : 10)} ${mixer.levels.song}%${mixer.muted.song ? " MUTE" : ""}`;
+    const remix = `${mixer.muted.remix ? "×" : bar(mixer.levels.remix, width < 62 ? 5 : 10)} ${mixer.levels.remix}%${mixer.muted.remix ? " MUTE" : ""}`;
+    return accent(crop(width < 62 ? `S ${song} [1/2]  R ${remix} [3/4]` : `SONG ${song} [1/2]   REMIX ${remix} [3/4]`, width));
+  };
+  const mixHelp = () => mixer.status || `${remixMode ? `Remix: Esc/M back · [ ] scale · ; sound · 0 song mute · 9 remix mute · 5–7 effects` : `m remix · 1/2 song · 3/4 remix · z motion ${motion ? "on" : "off"} · r repeat ${repeatQueue ? "on" : "off"}${backlight ? ` · K/J backlight ${backlight.label}` : backlight?.message ? ` · ${backlight.message}` : ""}`}${loadingSince && performance.now() - loadingSince >= 1000 ? " · Rendering artwork…" : ""}`;
+  let emptyStatus = "Choose a setup step below to start listening.";
   let scanning = false;
+  let wizardActive = false;
   let ascii = process.env.AHOY_ASCII === "1" || !/utf-?8/i.test(process.env.LC_ALL || process.env.LC_CTYPE || process.env.LANG || "UTF-8");
   let artWorker, artKey = "", artId = 0, artwork = null, artMetadata = {}, artMessage = "", loadingSince = 0;
   let startedAt = 0, elapsedBeforePause = 0, focus = -1, launching = false;
+  let repeatQueue = false;
   const elapsed = () => elapsedBeforePause + (child && !paused ? (performance.now() - startedAt) / 1000 : 0);
   const requestArt = (track, columns) => {
     const key = `${track.path}:${columns}`;
@@ -560,13 +716,15 @@ async function tui() {
   const renderTerminal = (track, active) => {
     const width = Math.max(16, (process.stdout.columns || 80) - 2), height = process.stdout.rows || 24;
     const queueRows = Math.min(tracks.length, height < 32 ? 1 : 5);
-    const columns = artColumns(width, height - (width < 64 ? 6 : 3) - queueRows);
+    const columns = artColumns(width, height - (width < 64 ? 6 : 3) - queueRows - (remixMode ? 3 : 0));
     requestArt(track, columns);
     const lines = [];
     const textLine = (value) => crop(terminalText(value), width);
     const deckHeader = ahoyId ? `AHOY / LIVE DECK — ⚓ AHOY ID: ${ahoyId}` : "AHOY / LIVE DECK";
-    lines.push(accent(deckHeader), dim(textLine("↑↓ select · enter play · space pause · v waveform · x quit")), dim("═".repeat(width)),
+    lines.push(accent(deckHeader), dim(textLine("↑↓ select · enter play · space pause · m remix · v waveform · x quit")), dim("═".repeat(width)),
+      textLine(channelMixLine(width)),
       accent(active ? "▶  NOW PLAYING" : paused ? "Ⅱ  PAUSED" : "○  READY"));
+    if (remixMode) lines.push(textLine(`REMIX ${remixScales[remixScaleIndex].name} · ${remixSounds[remixSoundIndex]} · Z–M/A–L piano · Shift synth · Tab/Esc back`));
     const artLines = artwork?.[ascii ? "ascii" : "braille"];
     if (artLines) lines.push(...artLines.map(textLine));
     else {
@@ -584,7 +742,7 @@ async function tui() {
       textLine(`${clockLabel(position)} / ${clockLabel(duration)}  ${active ? "PLAYING" : paused ? "PAUSED" : "READY"}`),
       textLine(`[${"=".repeat(filled)}${"-".repeat(barWidth - filled)}]`),
       ...controlLines,
-      dim(textLine("Tab focus · Enter activate · b Braille/ASCII")),
+      dim(textLine(remixMode ? "[ ] scale · ; sound · 0/9 mute · 1–4 layer level · 5–7 FX" : "Tab focus · Enter activate · b Braille/ASCII")),
       textLine(mixerLine()), dim(textLine(mixHelp())), dim("─".repeat(width)));
     const start = Math.max(0, Math.min(selected - Math.floor(queueRows / 2), tracks.length - queueRows));
     tracks.slice(start, start + queueRows).forEach((item, offset) => {
@@ -603,14 +761,14 @@ async function tui() {
       const width = Math.max(1, (process.stdout.columns || 80) - 2);
       const height = process.stdout.rows || 24;
       const deckHeader = ahoyId ? `AHOY / LIVE DECK — ⚓ AHOY ID: ${ahoyId}` : "AHOY / LIVE DECK";
-      const welcomeLine = ahoyId ? `Welcome back, ${ahoyId}.` : "Welcome aboard.";
+      const welcomeLine = ahoyId ? `Welcome back, ${ahoyId}.` : "Welcome aboard. Let’s get your player ready.";
       const lines = [
         deckHeader, "═".repeat(width),
-        welcomeLine, "No music yet. You're in the right place.", "",
-        emptyStatus, "", "s  Scan ~/Music", "r  Reload library",
-        ahoyId ? "l  Sign out" : "l  Sign in to AHOY ID",
-        "Or add another folder from your shell:", 'ahoy scan "/path/to/music"', "",
-        "Playback will be available once you add music.", mixerLine(), "v  Switch view    x  Quit"
+        welcomeLine, "Your library stays on this machine.", "",
+        emptyStatus, "", "s  Scan music folders",
+        "d  Try a demo track", "l  AHOY ID (optional)",
+        playbackReady ? "Audio output ready." : "Audio output needs mpv, VLC, or FFmpeg.",
+        "", "x  Quit"
       ].map(line => crop(terminalText(line), width));
       lines[0] = accent(lines[0]);
       lines[1] = dim(lines[1]);
@@ -622,36 +780,48 @@ async function tui() {
     if (terminalMode) { renderTerminal(track, active); return; }
     process.stdout.write("\x1b[0m");
     clearScreen();
-    const width = Math.max(54, Math.min(104, (process.stdout.columns || 86) - 8));
-    requestArt(track, artColumns(width, (process.stdout.rows || 24) - 5));
+    const width = Math.max(40, (process.stdout.columns || 86) - 4);
     const deckHeader = ahoyId ? `AHOY / LIVE DECK — ⚓ AHOY ID: ${ahoyId}` : "AHOY / LIVE DECK";
-    console.log(`${accent(deckHeader)}${dim("  ↑↓ select · enter play · space pause · m remix · v Terminal Art · x quit · l login/logout")}`);
+    console.log(accent(crop(`${deckHeader}  ·  s scan · ↑↓ browse · enter play · space pause · m remix · x quit`, width)));
     console.log(dim("═".repeat(width)));
-    console.log(`${accent(active ? "▶  NOW PLAYING" : paused ? "Ⅱ  PAUSED" : "○  READY")}  ${dim("ONE MUSIC TRACK · LOCAL OUTPUT")}`);
-    console.log(`${accent(crop(track.title.toUpperCase(), width - 2))}`);
-    console.log(dim(`${crop(track.artist, Math.floor(width / 2))}  ·  ${crop(track.album, Math.floor(width / 2) - 5)}`));
-    if (!artwork) console.log(spinningDisc(Math.min(40, width), 5, discFrame)[ascii ? "ascii" : "braille"].join("\n"));
-    else console.log(`\n${accent(waveform(tick, active && motion, width))}`);
-    console.log(`${dim("▔".repeat(width))}  ${dim(active ? "PLAYING" : paused ? "PAUSED — SPACE TO RESUME" : "ENTER TO PLAY")}`);
-    if (remixMode) console.log(formatPianoDeck(width, false, lastNote, { echo: sfxEcho, chorus: sfxChorus, lofi: sfxLoFi }, mixer.levels.song / 100, mixer.levels.remix / 100));
-    else console.log(dim("Press M for QWERTY piano remix notes over this track"));
-    console.log(mixerLine());
-    console.log(dim(mixHelp()));
+    console.log(channelMixLine(width));
+    console.log(`${accent(active ? "▶ NOW PLAYING" : paused ? "Ⅱ PAUSED" : "READY")}  ${crop(track.title, Math.max(1, width - 38))}  ${dim(`— ${track.artist}`)}`);
+    const playbackHint = active ? "PLAYING" : paused ? "PAUSED — SPACE TO RESUME" : "ENTER TO PLAY";
+    console.log(dim(`Album: ${track.album}  ·  ${playbackHint}`));
+    const position = currentTrack ? elapsed() : 0;
+    const durationKnown = Number.isFinite(currentDuration) && currentDuration > 0;
+    const progressWidth = Math.min(36, Math.max(12, width - 30));
+    const progressFilled = durationKnown ? Math.min(progressWidth, Math.floor(position / currentDuration * progressWidth)) : 0;
+    console.log(`${dim("Track")}  [${accent("━".repeat(progressFilled))}${dim("─".repeat(progressWidth - progressFilled))}]  ${clockLabel(position)} / ${clockLabel(durationKnown ? currentDuration : NaN)}`);
+    const volumeWidth = Math.min(20, Math.max(8, width - 24));
+    const volumeFilled = Math.round(mixer.levels.master / 100 * volumeWidth);
+    console.log(`Volume  [${accent("■".repeat(volumeFilled))}${dim("─".repeat(volumeWidth - volumeFilled))}]  ${mixer.levels.master}%  ${dim("+ / -")}`);
+    if (remixMode) console.log(formatPianoDeck(width, lastNote, { echo: sfxEcho, chorus: sfxChorus, lofi: sfxLoFi, mutedSong: mixer.muted.song, mutedRemix: mixer.muted.remix }, mixer.levels.song / 100, mixer.levels.remix / 100, remixScales[remixScaleIndex], remixSounds[remixSoundIndex], recentAction));
+    else console.log(dim("─".repeat(width)));
+    console.log(accent("LIBRARY") + dim(`  ${tracks.length} songs`));
+    console.log(dim(`${" ".repeat(7)}${"ARTIST".padEnd(Math.min(24, Math.max(10, Math.floor((width - 16) / 4))))}  SONG TITLE`));
     console.log(dim("─".repeat(width)));
-    const start = Math.max(0, Math.min(selected - 2, tracks.length - 5));
-    tracks.slice(start, start + 5).forEach((item, offset) => {
+    const rows = Math.max(1, (process.stdout.rows || 24) - (remixMode ? (width < 62 ? 18 : 20) : 14));
+    const start = Math.max(0, Math.min(selected - Math.floor(rows / 2), tracks.length - rows));
+    const artistWidth = Math.min(24, Math.max(10, Math.floor((width - 16) / 4)));
+    const titleWidth = Math.max(10, width - artistWidth - 12);
+    tracks.slice(start, start + rows).forEach((item, offset) => {
       const index = start + offset;
       const marker = index === selected ? accent("›") : " ";
       const playing = active && currentTrack?.id === item.id ? accent("▶") : " ";
-      console.log(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${crop(item.title, Math.max(25, width - 29))} ${dim(`— ${crop(item.artist, 20)}`)}`);
+      console.log(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${dim(crop(item.artist, artistWidth).padEnd(artistWidth))}  ${crop(item.title, titleWidth)}`);
     });
-    console.log(`\n${dim(`${tracks.length} local tracks · ${libraryPath}`)}`);
+    const footer = remixMode
+      ? "Piano · Shift synth · [ ] scale · ; sound · 0/9 mute · 1–4 mix · Tab/Esc back"
+      : "Up/Down Browse  Enter Play  Space Pause  S Scan  M Remix  R Repeat  Q Quit";
+    console.log(dim(crop(footer, width)));
   };
 
   const stop = () => {
     mixer.stopRemix(); mixer.paused = false;
     if (child && !child.killed) { if (paused) child.kill("SIGCONT"); child.kill(); }
     child = null; currentTrack = null; paused = false; remixMode = false;
+    currentDuration = NaN;
     elapsedBeforePause = 0;
   };
 
@@ -668,33 +838,113 @@ async function tui() {
     launching = true;
     stop(); currentTrack = tracks[selected];
     try {
-      const playingChild = await playTrack(currentTrack, { quiet: true, mixer });
+      const trackBeingStarted = currentTrack;
+      const knownDuration = Number(trackBeingStarted.duration_ms) / 1000;
+      currentDuration = Number.isFinite(knownDuration) && knownDuration > 0 ? knownDuration : NaN;
+      const playingChild = await playTrack(trackBeingStarted, { quiet: true, mixer });
       if (closed) { playingChild.kill(); return; }
       child = playingChild; startedAt = performance.now();
-      const finish = () => { if (child !== playingChild) return; child = null; currentTrack = null; paused = false; remixMode = false; elapsedBeforePause = 0; render(); };
+      if (!Number.isFinite(currentDuration)) {
+        void probeTrackDuration(trackBeingStarted.path).then((duration) => {
+          if (duration && currentTrack?.id === trackBeingStarted.id) { currentDuration = duration; render(); }
+        });
+      }
+      render();
+      const finish = () => {
+        if (child !== playingChild) return;
+        const finishedIndex = currentTrack ? tracks.findIndex((item) => item.id === currentTrack.id) : selected;
+        child = null; currentTrack = null; paused = false; remixMode = false; elapsedBeforePause = 0;
+        if (finishedIndex < tracks.length - 1 || repeatQueue) {
+          selected = (finishedIndex + 1) % tracks.length;
+          void startSelected();
+        } else render();
+      };
       child.once("exit", finish); child.once("error", finish);
     } catch (error) { currentTrack = null; artMessage = terminalText(error.message); }
     finally { launching = false; }
   };
   const skip = async (offset) => { selected = Math.max(0, Math.min(tracks.length - 1, (currentTrack ? tracks.indexOf(currentTrack) : selected) + offset)); await startSelected(); };
+  // First launch and the empty-library scan shortcut share the same setup flow.
+  if (!tracks.length) {
+    try {
+      const folders = await scanWizard();
+      if (folders?.length) {
+        const result = await scanDirectories(folders);
+        emptyStatus = `${result.added} tracks added · ${result.total} in your library.`;
+        tracks = (await loadLibrary()).tracks;
+      } else emptyStatus = "Scan skipped. Press s any time to scan for music.";
+      selected = 0;
+    } catch (error) {
+      emptyStatus = `Scan could not finish: ${terminalText(error.message)}`;
+    }
+  }
   render();
-  let lastTerminalSecond = -1;
+  let lastTerminalSecond = -1, lastProgressSecond = -1;
   const animation = setInterval(() => {
     tick += 1;
     if (motion && child && !child.killed && !paused) discFrame = (discFrame + 1) % 24;
     if (!tracks.length) return;
-    if (!terminalMode || (!artwork && motion && child && !paused) || Math.floor(performance.now() / 1000) !== lastTerminalSecond) { lastTerminalSecond = Math.floor(performance.now() / 1000); render(); }
+    const second = Math.floor(performance.now() / 1000);
+    if (!terminalMode) {
+      if (child && !paused && second !== lastProgressSecond) { lastProgressSecond = second; render(); }
+      return;
+    }
+    if ((!artwork && motion && child && !paused) || second !== lastTerminalSecond) { lastTerminalSecond = second; render(); }
   }, 180);
   const resize = () => render();
   process.stdout.on("resize", resize);
   process.stdin.setRawMode(true); process.stdin.resume();
 
   await new Promise((done) => process.stdin.on("data", async (key) => {
+    if (wizardActive) return;
     const value = key.toString();
-    if (value === "\u0003" || (!remixMode && (value === "x" || value === "q"))) { closed = true; clearInterval(animation); stop(); mixer.close(); void artWorker?.terminate(); process.stdout.off("resize", resize); process.stdin.setRawMode(false); process.stdin.pause(); process.stdout.write("\x1b[0m"); clearScreen(); done(); return; }
+    if (remixMode && value !== "\u0003") {
+      if (value === "\u001b" || value === "\t") {
+        remixMode = false;
+      } else if (value === " ") {
+        pauseOrResume();
+        recentAction = paused ? "Song paused" : "Song resumed";
+      } else if (value === "[" || value === "]") {
+        remixScaleIndex = (remixScaleIndex + (value === "]" ? 1 : remixScales.length - 1)) % remixScales.length;
+        recentAction = `Scale: ${remixScales[remixScaleIndex].name}`;
+      } else if (value === ";") {
+        remixSoundIndex = (remixSoundIndex + 1) % remixSounds.length;
+        recentAction = `Sound: ${remixSounds[remixSoundIndex]}`;
+      } else if (value === "0" || value === "9") {
+        const channel = value === "0" ? "song" : "remix";
+        const muted = mixer.toggleMute(channel);
+        recentAction = `${channel === "song" ? "Song" : "Remix"} ${muted ? "muted" : "unmuted"}`;
+      } else if (["1", "2", "3", "4"].includes(value)) {
+        mixer.adjust(value);
+        recentAction = `Song ${mixer.levels.song}% · Remix ${mixer.levels.remix}%`;
+      } else if (["+", "=", "-", "_"].includes(value)) {
+        mixer.adjust(value === "+" || value === "=" ? "9" : "8");
+      } else if (["5", "6", "7"].includes(value)) {
+        if (value === "5") sfxEcho = !sfxEcho;
+        if (value === "6") sfxChorus = !sfxChorus;
+        if (value === "7") sfxLoFi = !sfxLoFi;
+        recentAction = value === "5" ? `Echo ${sfxEcho ? "on" : "off"}` : value === "6" ? `Chorus ${sfxChorus ? "on" : "off"}` : `Lo-fi ${sfxLoFi ? "on" : "off"}`;
+        void playSfxCue(Number(value) - 4, 1, mixer).catch(error => { mixer.status = terminalText(error.message); });
+      } else if (!paused && pianoKeyMap[value.toLowerCase()]) {
+        const letter = value.toLowerCase(), synth = value !== letter;
+        const note = quantizeRemixFrequency(pianoKeyMap[letter].frequency, remixScales[remixScaleIndex]);
+        lastNote = { key: value, note: note.label, synth, time: Date.now() };
+        void playRemixNote(letter, synth, 1, { echo: sfxEcho, chorus: sfxChorus, lofi: sfxLoFi }, mixer, { scale: remixScales[remixScaleIndex], sound: remixSounds[remixSoundIndex].toLowerCase() })
+          .catch(error => { mixer.status = terminalText(error.message); });
+      }
+      render();
+      return;
+    }
+    if (value === "\u0003" || (!remixMode && (value === "x" || value === "q"))) { closed = true; clearInterval(animation); stop(); mixer.close(); void artWorker?.terminate(); process.stdout.off("resize", resize); process.stdin.setRawMode(false); process.stdin.pause(); process.stdout.write("\x1b[0m"); clearScreen(); try { await backlight?.restore(); } catch (error) { console.error(`Could not restore keyboard backlight: ${error.message}`); } done(); return; }
+    if (backlight && !remixMode && (value === "K" || value === "J")) { try { await backlight.adjust(value === "K" ? 1 : -1); } catch (error) { mixer.status = `Backlight control failed: ${error.message}`; } render(); return; }
     if (mixer.adjust(value)) { render(); return; }
     if (value === "\u001b") { remixMode = false; render(); return; }
     if (!remixMode && value === "z") motion = !motion;
+    if (!remixMode && value === "r") repeatQueue = !repeatQueue;
+    if (!remixMode && ["+", "=", "-", "_"].includes(value)) {
+      mixer.adjust(value === "+" || value === "=" ? "9" : "8");
+      render(); return;
+    }
     if (!remixMode && value === "v") { terminalMode = !terminalMode; focus = -1; }
     if (!remixMode && value === "l") {
       if (ahoyId) {
@@ -714,15 +964,40 @@ async function tui() {
       }
       render(); return;
     }
+    if (value === "s" && !scanning) {
+      scanning = true;
+      wizardActive = true;
+      process.stdin.setRawMode(false); process.stdin.pause();
+      try {
+        const folders = await scanWizard();
+        if (folders?.length) {
+          const result = await scanDirectories(folders);
+          emptyStatus = `${result.added} tracks added · ${result.total} in your library.`;
+        } else emptyStatus = "Scan skipped.";
+        tracks = (await loadLibrary()).tracks;
+        selected = Math.min(selected, Math.max(0, tracks.length - 1));
+      } catch (error) { emptyStatus = terminalText(error.message); }
+      finally {
+        process.stdin.setRawMode(true); process.stdin.resume();
+        wizardActive = false; scanning = false;
+      }
+      render(); return;
+    }
     if (!tracks.length) {
-      if ((value === "s" || value === "r") && !scanning) {
-        scanning = true; emptyStatus = value === "s" ? "Scanning ~/Music…" : "Reloading library…"; render();
+      if ((value === "r" || value === "d") && !scanning) {
+        scanning = true; emptyStatus = value === "d" ? "Adding the demo track…" : "Reloading library…"; render();
         try {
-          if (value === "s") await scanDirectories([join(homedir(), "Music")]);
+          if (value === "d") {
+            const { result } = await installDemo();
+            emptyStatus = `Demo added · ${result.total} track${result.total === 1 ? "" : "s"} in your library.`;
+          }
           tracks = (await loadLibrary()).tracks; selected = 0;
-          emptyStatus = "No MP3s found yet. Try another folder, then reload.";
+          if (!tracks.length && value !== "d") emptyStatus = "No tracks yet. Scan a folder or add the demo.";
         } catch (error) { emptyStatus = terminalText(error.message); }
-        finally { scanning = false; }
+        finally {
+          if (wizardActive) { process.stdin.setRawMode(true); process.stdin.resume(); wizardActive = false; }
+          scanning = false;
+        }
       }
       render(); return;
     }
@@ -734,22 +1009,9 @@ async function tui() {
     if (value === "\u001b[B" || (!remixMode && value === "j")) selected = Math.min(tracks.length - 1, selected + 1);
     if (value === " ") { if (terminalMode && !child) await startSelected(); else pauseOrResume(); }
     if (value === "m" || (!remixMode && value === "M")) { remixMode = !remixMode; render(); return; }
-    const alias = { "-": "3", "_": "3", "+": "4", "=": "4", "\u001b[D": "1", "\u001b[C": "2" }[value];
+    const alias = { "\u001b[D": "1", "\u001b[C": "2" }[value];
     if (alias) { mixer.adjust(alias); render(); return; }
     if (!terminalMode && (value === "[" || value === "]")) { mixer.adjust(value === "[" ? "1" : "2"); render(); return; }
-    if (["5", "6", "7"].includes(value)) {
-      if (value === "5") sfxEcho = !sfxEcho;
-      if (value === "6") sfxChorus = !sfxChorus;
-      if (value === "7") sfxLoFi = !sfxLoFi;
-      void playSfxCue(Number(value) - 4, 1, mixer).catch(error => { mixer.status = terminalText(error.message); render(); });
-      render(); return;
-    }
-    if (remixMode && !paused && pianoKeyMap[value.toLowerCase()]) {
-      const letter = value.toLowerCase(), synth = value !== letter;
-      lastNote = { key: value, note: pianoKeyMap[letter].note, synth, time: Date.now() };
-      void playRemixNote(letter, synth, 1, { echo: sfxEcho, chorus: sfxChorus, lofi: sfxLoFi }, mixer).catch(error => { mixer.status = terminalText(error.message); render(); });
-      render(); return;
-    }
     if (terminalMode && value === "[") await skip(-1);
     if (terminalMode && value === "]") await skip(1);
     if (value === "\r") {
@@ -765,7 +1027,7 @@ async function tui() {
 
 function help() {
   console.log("  ahoy rescan [folder...]     refresh the saved library from its folders");
-  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy player                open the terminal player (same as ahoy tui)\n  ahoy scan <folder...>      add MP3s from local folders\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n  ahoy update                install the latest published terminal player\n\nmacOS uses the built-in afplay. Linux uses mpv, VLC (cvlc), or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
+  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy player                open the terminal player (same as ahoy tui)\n  ahoy scan [folder...]      add MP3s from local folders; interactive folder choice when run in a terminal\n  ahoy backlight             check Linux keyboard backlight support and permissions\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n  ahoy update                install the latest published terminal player\n\nIn the player, press s to scan and r to repeat the library.\nKeyboard backlight control is opt-in: set AHOY_KEYBOARD_BACKLIGHT=1; use K/J to adjust.\nmacOS uses the built-in afplay. Linux uses mpv, VLC (cvlc), or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
 }
 
 export async function main(args = process.argv.slice(2)) {
@@ -773,8 +1035,9 @@ export async function main(args = process.argv.slice(2)) {
   if (["help", "--help", "-h"].includes(command)) return help();
   if (["--version", "-v", "version"].includes(command)) return console.log(await packageVersion());
   if (command === "update") return update();
+  if (command === "backlight") return keyboardBacklightCommand();
   if (command === "scan") {
-    const result = await scanDirectories(rest.length ? rest : [join(homedir(), "Music")]);
+    const result = rest.length ? await scanDirectories(rest) : await scanDefaultMusic();
     console.log(`${accent("Library updated")} · ${result.added} added, ${result.updated} refreshed, ${result.total} total`);
     if (!result.total && process.stdin.isTTY && process.stdout.isTTY) return tui();
     return;

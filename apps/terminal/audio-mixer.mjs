@@ -12,7 +12,7 @@ export function adjustLevel(levels, key) {
   levels[channel] = Math.max(0, Math.min(100, levels[channel] + delta));
   return true;
 }
-export const channelVolume = (levels, channel) => levels.master * levels[channel] / 100;
+export const channelVolume = (levels, channel, muted = false) => muted ? 0 : levels.master * levels[channel] / 100;
 export function volumeArgs(command, volume) {
   if (command === "mpv") return [`--volume=${volume}`, "--volume-max=100", "--audio-display=no"];
   if (command === "ffplay") return ["-volume", String(Math.round(volume))];
@@ -46,6 +46,7 @@ export function sendVolume(socketPath, volume) {
 
 export class AudioMixer {
   levels = { master: 100, song: 100, remix: 100 };
+  muted = { song: false, remix: false };
   voices = new Set();
   status = "";
   paused = false;
@@ -56,7 +57,7 @@ export class AudioMixer {
     const directory = player.command === "mpv" ? await mkdtemp(join(tmpdir(), "ahoy-mix-")) : null;
     if (this.closed) { if (directory) await rm(directory, { recursive: true, force: true }); throw new Error("Mixer closed"); }
     const socketPath = directory ? join(directory, "control.sock") : null;
-    const args = [...player.baseArgs, ...volumeArgs(player.command, channelVolume(this.levels, channel)),
+    const args = [...player.baseArgs, ...volumeArgs(player.command, channelVolume(this.levels, channel, this.muted[channel])),
       ...(socketPath ? [`--input-ipc-server=${socketPath}`] : []), path];
     const child = spawn(player.command, args, { stdio });
     const voice = { child, channel, socketPath };
@@ -78,6 +79,13 @@ export class AudioMixer {
     this.apply(); return true;
   }
 
+  toggleMute(channel) {
+    if (!(channel in this.muted)) return false;
+    this.muted[channel] = !this.muted[channel];
+    this.apply();
+    return this.muted[channel];
+  }
+
   apply() {
     // Serialize rapid key presses so an older IPC request cannot win the race.
     this.update = this.update.then(async () => {
@@ -85,7 +93,7 @@ export class AudioMixer {
         if (!voice.socketPath || (this.paused && voice.channel === "song")) return;
         for (let attempt = 0; attempt < 8; attempt++) {
           if (!this.voices.has(voice) || voice.child.killed) return;
-          try { await sendVolume(voice.socketPath, channelVolume(this.levels, voice.channel)); this.status = ""; return; }
+          try { await sendVolume(voice.socketPath, channelVolume(this.levels, voice.channel, this.muted[voice.channel])); this.status = ""; return; }
           catch { if (attempt < 7) await new Promise(resolve => setTimeout(resolve, 50)); }
         }
         if (this.voices.has(voice)) this.status = "Could not update playback volume.";

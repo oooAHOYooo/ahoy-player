@@ -15,6 +15,7 @@ assets = [
     ["target/release/ahoy-player", "usr/bin/", "755"],
     ["packaging/linux/ahoy", "usr/bin/", "755"],
     ["apps/terminal/ahoy.mjs", "usr/lib/ahoy-player-terminal/", "644"],
+    ["apps/terminal/auth.mjs", "usr/lib/ahoy-player-terminal/", "644"],
     ["apps/terminal/terminal-art.mjs", "usr/lib/ahoy-player-terminal/", "644"],
     ["apps/terminal/artwork-worker.mjs", "usr/lib/ahoy-player-terminal/", "644"],
     ["apps/terminal/audio-mixer.mjs", "usr/lib/ahoy-player-terminal/", "644"],

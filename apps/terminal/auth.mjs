@@ -1,11 +1,15 @@
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { exec } from "node:child_process";
+import { spawn } from "node:child_process";
 
 const appHome = process.env.AHOY_PLAYER_HOME || join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "ahoy-player");
 const authPath = join(appHome, "auth.json");
+const issuer = (process.env.AHOY_ID_ISSUER || "https://id.ahoy.ooo").replace(/\/$/, "");
+const clientId = "app.ahoy.player";
+const redirectUri = "http://127.0.0.1:3021/callback";
 
 export async function getAhoyId() {
   try {
@@ -17,93 +21,108 @@ export async function getAhoyId() {
 }
 
 export async function saveAhoyId(ahoy_id) {
-  await writeFile(authPath, JSON.stringify({ ahoy_id }), "utf-8");
+  await mkdir(appHome, { recursive: true });
+  await writeFile(authPath, JSON.stringify({ ahoy_id }), { encoding: "utf-8", mode: 0o600 });
 }
 
 export async function logout() {
-  await writeFile(authPath, JSON.stringify({}), "utf-8");
+  await mkdir(appHome, { recursive: true });
+  await writeFile(authPath, JSON.stringify({}), { encoding: "utf-8", mode: 0o600 });
 }
 
 export function openBrowser(url) {
-  const start = platform() === 'darwin' ? 'open' : platform() === 'win32' ? 'start' : 'xdg-open';
-  exec(`${start} "${url}"`);
+  if (process.env.AHOY_ID_NO_BROWSER === "1") return;
+  const [command, args] = platform() === "darwin"
+    ? ["open", [url]]
+    : platform() === "win32"
+      ? ["cmd", ["/c", "start", "", url]]
+      : ["xdg-open", [url]];
+  const child = spawn(command, args, { detached: true, stdio: "ignore" });
+  child.unref();
 }
 
-import qrcode from "qrcode-terminal";
+export async function startLoginFlow(showQr = false) {
+  const server = createServer();
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(3021, "127.0.0.1", resolve);
+  });
 
-const useColor = Boolean(process.stdout.isTTY && !process.env.NO_COLOR);
-const tint = (code, value) => useColor ? `\x1b[${code}m${value}\x1b[0m` : value;
-const accent = (value) => tint("38;5;156", value);
+  const state = randomBytes(32).toString("base64url");
+  const verifier = randomBytes(48).toString("base64url");
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  const loginUrl = new URL(`${issuer}/oauth/authorize`);
+  Object.entries({
+    response_type: "code",
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: "openid profile",
+    state,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+  }).forEach(([key, value]) => loginUrl.searchParams.set(key, value));
 
-export async function startLoginFlow(useDeviceFlow = false) {
-  return new Promise(async (resolve, reject) => {
-    // 1. Hypothetical Device Flow (if backend supports it)
-    if (useDeviceFlow) {
-      console.log("\nInitiating Device Code flow...");
-      try {
-        const res = await fetch("https://id.ahoy.ooo/oauth/device/code", { method: "POST" });
-        if (res.ok) {
-          const data = await res.json();
-          console.log(`\nPlease visit: ${accent(data.verification_uri)}`);
-          console.log(`And enter the code: ${accent(data.user_code)}\n`);
-          qrcode.generate(data.verification_uri + "?user_code=" + data.user_code, { small: true });
-          
-          // Poll for completion
-          const interval = setInterval(async () => {
-            const poll = await fetch(`https://id.ahoy.ooo/oauth/device/token?device_code=${data.device_code}`, { method: "POST" });
-            if (poll.ok) {
-              const tokenData = await poll.json();
-              clearInterval(interval);
-              await saveAhoyId(tokenData.ahoy_id);
-              resolve(tokenData.ahoy_id);
-            }
-          }, (data.interval || 5) * 1000);
+  try {
+    const code = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("AHOY ID sign-in timed out")), 5 * 60_000);
+      server.once("close", () => clearTimeout(timeout));
+      server.on("request", (req, res) => {
+        const callback = new URL(req.url || "/", redirectUri);
+        if (req.method !== "GET" || callback.pathname !== "/callback") {
+          res.writeHead(404).end("Not found");
           return;
         }
-      } catch (e) {
-        console.log("Device flow endpoint not available yet. Falling back to local browser flow...");
-      }
-    }
-
-    // 2. Standard Localhost Redirect Flow
-    const server = createServer(async (req, res) => {
-      try {
-        const url = new URL(req.url, `http://localhost:3021`);
-        if (url.pathname === "/callback") {
-          const ahoy_id = url.searchParams.get("ahoy_id");
-          if (ahoy_id) {
-            await saveAhoyId(ahoy_id);
-            res.writeHead(200, { "Content-Type": "text/html" });
-            res.end("<html><body><h1>Logged in!</h1><p>You can close this window and return to Ahoy Player.</p><script>setTimeout(() => window.close(), 3000)</script></body></html>");
-            server.close();
-            resolve(ahoy_id);
-          } else {
-            res.writeHead(400);
-            res.end("Missing ahoy_id in callback");
-          }
-        } else {
-          res.writeHead(404);
-          res.end("Not found");
+        const returnedState = callback.searchParams.get("state") || "";
+        const expected = Buffer.from(state);
+        const received = Buffer.from(returnedState);
+        if (expected.length !== received.length || !timingSafeEqual(expected, received)) {
+          res.writeHead(400, { "cache-control": "no-store" }).end("Sign-in state did not match. Return to Ahoy Player and try again.");
+          server.close();
+          reject(new Error("AHOY ID callback state did not match"));
+          return;
         }
-      } catch (err) {
-        res.writeHead(500);
-        res.end(err.message);
+        const error = callback.searchParams.get("error");
+        if (error) {
+          res.writeHead(400, { "cache-control": "no-store" }).end("Sign-in was cancelled. You can close this tab.");
+          server.close();
+          reject(new Error(`AHOY ID authorization failed: ${error}`));
+          return;
+        }
+        const authCode = callback.searchParams.get("code");
+        if (!authCode) {
+          res.writeHead(400, { "cache-control": "no-store" }).end("AHOY ID did not return an authorization code.");
+          return;
+        }
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer" })
+          .end("<!doctype html><meta charset=utf-8><title>Ahoy Player</title><h1>Sign-in complete</h1><p>You can close this tab and return to Ahoy Player.</p>");
+        server.close();
+        resolve(authCode);
+      });
+      openBrowser(loginUrl.toString());
+      if (showQr) {
+        console.log("\nIf the browser did not open, visit this link:");
+        console.log(`\n  ${loginUrl}\n`);
+        console.log("Open the link on this computer so the callback can return to the player.\n");
+        import("qrcode-terminal").then(({ default: qrcode }) => qrcode.generate(loginUrl.toString(), { small: true })).catch(() => {});
       }
     });
-    
-    server.listen(3021, () => {
-      const loginUrl = `https://id.ahoy.ooo/login?client_id=ahoy-player&redirect_uri=http://127.0.0.1:3021/callback`;
-      openBrowser(loginUrl);
-      if (useDeviceFlow) {
-        console.log(`\nOpening your browser to authenticate...`);
-        console.log(`If your browser doesn't open automatically, please visit this link:\n\n  ${loginUrl}\n`);
-        console.log(`Or scan this QR code on a device that can reach localhost:3021:\n`);
-        qrcode.generate(loginUrl, { small: true });
-      }
+
+    const tokenResponse = await fetch(`${issuer}/api/v1/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ grant_type: "authorization_code", code, client_id: clientId, redirect_uri: redirectUri, code_verifier: verifier }),
     });
-    
-    server.on('error', (err) => {
-      reject(err);
-    });
-  });
+    if (!tokenResponse.ok) throw new Error(`AHOY ID token exchange failed (HTTP ${tokenResponse.status})`);
+    const token = await tokenResponse.json();
+    if (typeof token.access_token !== "string" || token.token_type?.toLowerCase() !== "bearer") throw new Error("AHOY ID returned an invalid token response");
+
+    const userinfoResponse = await fetch(`${issuer}/api/v1/oauth/userinfo`, { headers: { authorization: `Bearer ${token.access_token}` } });
+    if (!userinfoResponse.ok) throw new Error(`AHOY ID identity lookup failed (HTTP ${userinfoResponse.status})`);
+    const userinfo = await userinfoResponse.json();
+    if (typeof userinfo.sub !== "string" || !userinfo.sub.trim()) throw new Error("AHOY ID returned an invalid identity");
+    await saveAhoyId(userinfo.sub);
+    return userinfo.sub;
+  } finally {
+    server.close();
+  }
 }

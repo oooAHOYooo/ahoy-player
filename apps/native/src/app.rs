@@ -1,10 +1,25 @@
 use crate::{audio::{AudioPlayer, QueueState}, files::pick_mp3s, layouts, library::{ImportResult, Library, Track}, themes::{self, Theme}, auth};
 use anyhow::Result;
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
+use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::mpsc::Receiver, time::Duration};
 slint::include_modules!();
 
-struct State { library: Library, themes: Vec<Theme>, theme_index: usize, layout: layouts::Layout, audio: Option<AudioPlayer>, queue: QueueState, data_dir: PathBuf, auth: auth::Auth }
+struct State {
+    library: Library,
+    themes: Vec<Theme>,
+    theme_index: usize,
+    layout: layouts::Layout,
+    audio: Option<AudioPlayer>,
+    queue: QueueState,
+    data_dir: PathBuf,
+    auth: auth::Auth,
+    auth_login_rx: Option<Receiver<anyhow::Result<String>>>,
+    remix_enabled: bool,
+    synth: bool,
+    echo: bool,
+    chorus: bool,
+    lo_fi: bool,
+}
 
 pub fn run() -> Result<()> {
     let tray_menu = tray_icon::menu::Menu::new();
@@ -32,7 +47,10 @@ pub fn run() -> Result<()> {
     let queue = QueueState::new(library.tracks.iter().map(|track| track.id.clone()).collect());
     let audio = AudioPlayer::new().ok();
     let audio_status = if audio.is_some() { "Ready" } else { "Audio output unavailable" };
-    let state = Rc::new(RefCell::new(State { library, themes, theme_index: 0, layout, audio, queue, data_dir, auth }));
+    let state = Rc::new(RefCell::new(State {
+        library, themes, theme_index: 0, layout, audio, queue, data_dir, auth, auth_login_rx: None,
+        remix_enabled: false, synth: false, echo: false, chorus: false, lo_fi: false,
+    }));
     let window = AppWindow::new()?;
     refresh(&window, &state.borrow());
     window.set_show_welcome_modal(!state.borrow().auth.welcome_dismissed && state.borrow().auth.ahoy_id.is_none());
@@ -42,6 +60,16 @@ pub fn run() -> Result<()> {
         window.set_ahoy_id("".into());
     }
     window.set_status(audio_status.into());
+    window.set_remix_enabled(false);
+    window.set_synth(false);
+    window.set_echo(false);
+    window.set_chorus(false);
+    window.set_lo_fi(false);
+    window.set_volume(100.0);
+    window.set_song_volume(100.0);
+    window.set_remix_volume(80.0);
+    window.set_shuffle(state.borrow().queue.shuffle);
+    window.set_repeat(state.borrow().queue.repeat);
     let initial_theme = state.borrow().themes[0].clone();
     apply_theme(&window, &initial_theme);
 
@@ -98,8 +126,29 @@ pub fn run() -> Result<()> {
     window.on_set_volume(move |vol| {
         if let Some(window) = weak.upgrade() {
             let mut state = state_volume.borrow_mut();
+            window.set_volume(vol);
             if let Some(audio) = &mut state.audio {
                 audio.set_volume(vol / 100.0);
+            }
+        }
+    });
+
+    let weak = window.as_weak(); let state_song_volume = state.clone();
+    window.on_set_song_volume(move |vol| {
+        if let Some(window) = weak.upgrade() {
+            window.set_song_volume(vol);
+            if let Some(audio) = &mut state_song_volume.borrow_mut().audio {
+                audio.set_song_volume(vol / 100.0);
+            }
+        }
+    });
+
+    let weak = window.as_weak(); let state_remix_volume = state.clone();
+    window.on_set_remix_volume(move |vol| {
+        if let Some(window) = weak.upgrade() {
+            window.set_remix_volume(vol);
+            if let Some(audio) = &mut state_remix_volume.borrow_mut().audio {
+                audio.set_remix_volume(vol / 100.0);
             }
         }
     });
@@ -115,6 +164,65 @@ pub fn run() -> Result<()> {
 
     let weak = window.as_weak(); let state_next = state.clone(); window.on_next_track(move || advance(&weak, &state_next, true));
     let weak = window.as_weak(); let state_previous = state.clone(); window.on_previous_track(move || advance(&weak, &state_previous, false));
+
+    let weak = window.as_weak(); let state_shuffle = state.clone();
+    window.on_toggle_shuffle(move || {
+        let mut state = state_shuffle.borrow_mut();
+        state.queue.shuffle = !state.queue.shuffle;
+        let value = state.queue.shuffle;
+        if let Some(window) = weak.upgrade() { window.set_shuffle(value); window.set_status(if value { "Shuffle on" } else { "Shuffle off" }.into()); }
+    });
+
+    let weak = window.as_weak(); let state_repeat = state.clone();
+    window.on_toggle_repeat(move || {
+        let mut state = state_repeat.borrow_mut();
+        state.queue.repeat = !state.queue.repeat;
+        let value = state.queue.repeat;
+        if let Some(window) = weak.upgrade() { window.set_repeat(value); window.set_status(if value { "Repeat on" } else { "Repeat off" }.into()); }
+    });
+
+    let weak = window.as_weak(); let state_remix = state.clone();
+    window.on_toggle_remix(move || {
+        let mut state = state_remix.borrow_mut();
+        state.remix_enabled = !state.remix_enabled;
+        if let Some(window) = weak.upgrade() {
+            window.set_remix_enabled(state.remix_enabled);
+            window.set_status(if state.remix_enabled { "Remix keyboard ready · Q W E R T Y U I" } else { "Remix keyboard off" }.into());
+        }
+    });
+
+    let weak = window.as_weak(); let state_synth = state.clone();
+    window.on_toggle_synth(move || {
+        let mut state = state_synth.borrow_mut(); state.synth = !state.synth;
+        if let Some(window) = weak.upgrade() { window.set_synth(state.synth); }
+    });
+    let weak = window.as_weak(); let state_echo = state.clone();
+    window.on_toggle_echo(move || {
+        let mut state = state_echo.borrow_mut(); state.echo = !state.echo;
+        if let Some(window) = weak.upgrade() { window.set_echo(state.echo); }
+    });
+    let weak = window.as_weak(); let state_chorus = state.clone();
+    window.on_toggle_chorus(move || {
+        let mut state = state_chorus.borrow_mut(); state.chorus = !state.chorus;
+        if let Some(window) = weak.upgrade() { window.set_chorus(state.chorus); }
+    });
+    let weak = window.as_weak(); let state_lofi = state.clone();
+    window.on_toggle_lofi(move || {
+        let mut state = state_lofi.borrow_mut(); state.lo_fi = !state.lo_fi;
+        if let Some(window) = weak.upgrade() { window.set_lo_fi(state.lo_fi); }
+    });
+
+    let state_note = state.clone(); let weak = window.as_weak();
+    window.on_play_remix_note(move |index, synth_held| {
+        let mut state = state_note.borrow_mut();
+        if !state.remix_enabled || !state.queue.playing { return; }
+        let (synth, echo, chorus, lo_fi) = (state.synth || synth_held, state.echo, state.chorus, state.lo_fi);
+        let result = state.audio.as_mut().map(|audio| audio.play_remix_note(index as usize, synth, echo, chorus, lo_fi));
+        if !matches!(result, Some(Ok(()))) {
+            if let Some(window) = weak.upgrade() { window.set_status("Audio output unavailable".into()); }
+            return;
+        }
+    });
 
     let weak = window.as_weak(); let state_theme = state.clone();
     window.on_next_theme(move || { if let Some(window) = weak.upgrade() { let mut state = state_theme.borrow_mut(); state.theme_index = (state.theme_index + 1) % state.themes.len(); let theme = state.themes[state.theme_index].clone(); apply_theme(&window, &theme); window.set_theme_name(theme.name.into()); window.set_status("Theme changed".into()); } });
@@ -138,15 +246,14 @@ pub fn run() -> Result<()> {
     window.on_login_ahoy(move || {
         if let Some(window) = weak.upgrade() {
             let mut state = state_login.borrow_mut();
-            window.set_status("Waiting for browser login...".into());
-            if let Ok(ahoy_id) = crate::auth::start_login_server() {
-                state.auth.ahoy_id = Some(ahoy_id.clone());
-                window.set_ahoy_id(ahoy_id.into());
-                let _ = crate::auth::save(&state.data_dir.join("auth.json"), &state.auth);
-                window.set_status("Logged in successfully.".into());
-            } else {
-                window.set_status("Login failed".into());
+            if state.auth_login_rx.is_some() {
+                window.set_status("Waiting for browser sign-in to finish…".into());
+                return;
             }
+            window.set_status("Waiting for browser login...".into());
+            let (sender, receiver) = std::sync::mpsc::channel();
+            state.auth_login_rx = Some(receiver);
+            std::thread::spawn(move || { let _ = sender.send(crate::auth::start_login_server()); });
         }
     });
 
@@ -171,11 +278,66 @@ pub fn run() -> Result<()> {
         }
     });
 
+    let auto_advance_timer = Timer::default();
+    let weak = window.as_weak(); let state_auto_advance = state.clone();
+    auto_advance_timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
+        let auth_result = {
+            let mut state = state_auto_advance.borrow_mut();
+            let result = state.auth_login_rx.as_ref().and_then(|receiver| match receiver.try_recv() {
+                Ok(result) => Some(result),
+                Err(std::sync::mpsc::TryRecvError::Empty) => None,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => Some(Err(anyhow::anyhow!("Sign-in was interrupted"))),
+            });
+            if result.is_some() { state.auth_login_rx = None; }
+            result
+        };
+        if let Some(result) = auth_result {
+            if let Some(window) = weak.upgrade() {
+                match result {
+                    Ok(ahoy_id) => {
+                        let mut state = state_auto_advance.borrow_mut();
+                        state.auth.ahoy_id = Some(ahoy_id.clone());
+                        if crate::auth::save(&state.data_dir.join("auth.json"), &state.auth).is_ok() {
+                            window.set_ahoy_id(ahoy_id.into());
+                            window.set_status("AHOY ID connected".into());
+                        } else {
+                            window.set_status("Signed in, but could not save the account locally".into());
+                        }
+                    }
+                    Err(error) => window.set_status(format!("AHOY ID sign-in failed: {error}").into()),
+                }
+            }
+        }
+        let finished = {
+            let state = state_auto_advance.borrow();
+            state.queue.playing && state.audio.as_ref().map(AudioPlayer::is_finished).unwrap_or(false)
+        };
+        if finished { advance(&weak, &state_auto_advance, true); }
+    });
+
     window.run()?;
+    drop(auto_advance_timer);
     Ok(())
 }
 
-fn advance(weak: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>>, next: bool) { if let Some(window) = weak.upgrade() { let mut state = state.borrow_mut(); if next { state.queue.next(); } else { state.queue.previous(); } if let Some(index) = state.queue.index { if let Some(track) = state.library.tracks.get(index).cloned() { let _ = play_track(&mut state, &window, &track); } } else { window.set_status("No tracks in queue".into()); } } }
+fn advance(weak: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>>, next: bool) {
+    if let Some(window) = weak.upgrade() {
+        let mut state = state.borrow_mut();
+        let moved = if next { state.queue.next() } else { state.queue.previous() };
+        if moved {
+            if let Some(index) = state.queue.index {
+                if let Some(track) = state.library.tracks.get(index).cloned() {
+                    let _ = play_track(&mut state, &window, &track);
+                }
+            }
+        } else if next {
+            if let Some(audio) = &mut state.audio { audio.stop(); }
+            state.queue.playing = false;
+            window.set_playing(false);
+            window.set_status("End of queue".into());
+        }
+    }
+}
 
 fn play_track(state: &mut State, window: &AppWindow, track: &Track) -> bool { let Some(audio) = &mut state.audio else { state.queue.playing = false; window.set_status("Audio output unavailable".into()); return false; }; match audio.play(&track.path) { Ok(()) => { state.queue.playing = true; window.set_now_playing(format!("{} — {}", track.artist, track.title).into()); window.set_playing(true); true }, Err(error) => { state.queue.playing = false; window.set_playing(false); window.set_status(format!("Could not play track: {error}").into()); false } } }
 

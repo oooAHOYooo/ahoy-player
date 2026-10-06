@@ -18,6 +18,7 @@
   ],
   "files": [
     "ahoy.mjs",
+    "auth.mjs",
     "terminal-art.mjs",
     "artwork-worker.mjs",
     "audio-mixer.mjs",
