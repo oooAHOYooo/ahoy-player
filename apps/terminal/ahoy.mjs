@@ -895,7 +895,33 @@ async function tui() {
   process.stdout.on("resize", resize);
   process.stdin.setRawMode(true); process.stdin.resume();
 
-  await new Promise((done) => process.stdin.on("data", async (key) => {
+  let finishTui;
+  let shutdownPromise;
+  const shutdown = async (exitCode) => {
+    if (shutdownPromise) return shutdownPromise;
+    shutdownPromise = (async () => {
+      closed = true;
+      clearInterval(animation);
+      stop();
+      mixer.close();
+      process.stdout.off("resize", resize);
+      process.stdin.off("data", onKey);
+      process.off("SIGINT", onSigint);
+      process.off("SIGTERM", onSigterm);
+      try { if (process.stdin.isTTY) process.stdin.setRawMode(false); } catch {}
+      process.stdin.pause();
+      process.stdout.write("\x1b[0m");
+      clearScreen();
+      try { await artWorker?.terminate(); } catch {}
+      try { await backlight?.restore(); } catch (error) { console.error(`Could not restore keyboard backlight: ${error.message}`); }
+      if (exitCode !== undefined) process.exitCode = exitCode;
+      finishTui?.();
+    })();
+    return shutdownPromise;
+  };
+  const onSigint = () => { void shutdown(130); };
+  const onSigterm = () => { void shutdown(143); };
+  const onKey = async (key) => {
     if (wizardActive) return;
     const value = key.toString();
     if (remixMode && value !== "\u0003") {
@@ -935,7 +961,7 @@ async function tui() {
       render();
       return;
     }
-    if (value === "\u0003" || (!remixMode && (value === "x" || value === "q"))) { closed = true; clearInterval(animation); stop(); mixer.close(); void artWorker?.terminate(); process.stdout.off("resize", resize); process.stdin.setRawMode(false); process.stdin.pause(); process.stdout.write("\x1b[0m"); clearScreen(); try { await backlight?.restore(); } catch (error) { console.error(`Could not restore keyboard backlight: ${error.message}`); } done(); return; }
+    if (value === "\u0003" || (!remixMode && (value === "x" || value === "q"))) { await shutdown(); return; }
     if (backlight && !remixMode && (value === "K" || value === "J")) { try { await backlight.adjust(value === "K" ? 1 : -1); } catch (error) { mixer.status = `Backlight control failed: ${error.message}`; } render(); return; }
     if (mixer.adjust(value)) { render(); return; }
     if (value === "\u001b") { remixMode = false; render(); return; }
@@ -1022,7 +1048,13 @@ async function tui() {
       else { terminalMode = false; focus = -1; }
     }
     render();
-  }));
+  };
+  process.once("SIGINT", onSigint);
+  process.once("SIGTERM", onSigterm);
+  await new Promise((done) => {
+    finishTui = done;
+    process.stdin.on("data", onKey);
+  });
 }
 
 function help() {

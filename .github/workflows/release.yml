@@ -1,0 +1,53 @@
+name: Terminal CLI release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-terminal-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check release tag and package version
+        working-directory: apps/terminal
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node --input-type=module -e '
+            import manifest from "./package.json" with { type: "json" };
+            const expected = `v${manifest.version}`;
+            if (process.env.RELEASE_TAG !== expected) {
+              console.error(`Tag ${process.env.RELEASE_TAG} does not match ${expected}`);
+              process.exit(1);
+            }
+          '
+
+      - name: Install terminal package dependencies
+        run: npm install --prefix apps/terminal --no-package-lock --ignore-scripts
+
+      - name: Check CLI syntax
+        run: npm run typecheck --prefix apps/terminal
+
+      - name: Run CLI tests
+        run: npm test --prefix apps/terminal
+
+      - name: Pack CLI release asset
+        run: npm pack ./apps/terminal --pack-destination "$RUNNER_TEMP"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Ahoy Player ${{ github.ref_name }} — Terminal CLI
+          generate_release_notes: true
+          files: ${{ runner.temp }}/ahoy-player-terminal-*.tgz
+          fail_on_unmatched_files: true
