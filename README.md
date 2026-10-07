@@ -69,14 +69,14 @@ An AppImage is not produced or advertised as installing `ahoy` globally. It need
 
 ## Terminal CLI/TUI
 
-Install it once on any macOS, Linux, or Windows machine with Node.js 20+:
+Install it once on macOS, Linux, or Windows with Node.js 20+:
 
 ```bash
 npm install --global @ahoy/player-terminal
 ```
 
-Until the npm package is published, macOS and Linux users can install directly
-from the public source repository instead:
+The npm package is the recommended cross-platform install. On macOS and Linux,
+you can also install directly from the source repository:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/oooAHOYooo/ahoy-player/main/scripts/install-cli.sh | bash
@@ -96,6 +96,10 @@ remain in that user's home directory.
 Run that command again later to fast-forward to the latest source and reinstall
 the global command. It never resets a modified local checkout.
 
+On Windows, use the npm install command above from PowerShell or Command Prompt.
+On macOS and Linux, either install method makes `ahoy` available from any
+terminal directory (you may need to add npm's global bin directory to `PATH`).
+
 Then, from any terminal directory:
 
 ```bash
@@ -104,8 +108,10 @@ ahoy player
 
 `ahoy player` is the interactive terminal player. Run `ahoy update` whenever you
 want the latest published version (or use your package manager's normal global
-update command). The package needs to be published to npm before this installation
-command is available publicly.
+update command). Node.js 20+ is required on every platform. Audio playback uses
+the built-in `afplay` on macOS; Linux requires `mpv`, VLC (`cvlc`), or FFmpeg
+(`ffplay`). Windows TUI and library commands work, while Windows audio playback
+is not supported yet.
 
 ```bash
 npm install
