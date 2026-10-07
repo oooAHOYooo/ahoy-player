@@ -71,12 +71,11 @@ An AppImage is not produced or advertised as installing `ahoy` globally. It need
 
 Install it once on macOS, Linux, or Windows with Node.js 20+:
 
-```bash
-npm install --global @ahoy/player-terminal
+```sh
+npm install --global https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.2.3/ahoy-player-terminal-0.2.3.tgz
 ```
 
-The npm package is the recommended cross-platform install. On macOS and Linux,
-you can also install directly from the source repository:
+On macOS and Linux, you can also use the source installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/oooAHOYooo/ahoy-player/main/scripts/install-cli.sh | bash
@@ -93,12 +92,12 @@ The system installer puts `ahoy` in `/usr/local/bin` and its files in
 `/usr/local/lib/ahoy-player-terminal`. Each user's music library and settings
 remain in that user's home directory.
 
-Run that command again later to fast-forward to the latest source and reinstall
-the global command. It never resets a modified local checkout.
+Run the source installer again later to fast-forward to the latest source and
+reinstall the global command. It never resets a modified local checkout.
 
-On Windows, use the npm install command above from PowerShell or Command Prompt.
-On macOS and Linux, either install method makes `ahoy` available from any
-terminal directory (you may need to add npm's global bin directory to `PATH`).
+The tarball install works from PowerShell or Command Prompt on Windows, and from
+any terminal on macOS and Linux. npm may ask you to add its global bin directory
+to `PATH`.
 
 Then, from any terminal directory:
 
@@ -106,9 +105,9 @@ Then, from any terminal directory:
 ahoy player
 ```
 
-`ahoy player` is the interactive terminal player. Run `ahoy update` whenever you
-want the latest published version (or use your package manager's normal global
-update command). Node.js 20+ is required on every platform. Audio playback uses
+`ahoy player` is the interactive terminal player. To update a tarball install,
+repeat the command above with the newer release's version and asset URL. Node.js
+20+ is required on every platform. Audio playback uses
 the built-in `afplay` on macOS; Linux requires `mpv`, VLC (`cvlc`), or FFmpeg
 (`ffplay`). Windows TUI and library commands work, while Windows audio playback
 is not supported yet.
