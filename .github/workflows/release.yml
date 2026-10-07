@@ -1,4 +1,4 @@
-name: Terminal CLI release
+name: Ahoy Player release
 
 on:
   push:
@@ -9,45 +9,153 @@ permissions:
   contents: write
 
 jobs:
-  release-terminal-cli:
+  version-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Check release tag and package version
-        working-directory: apps/terminal
+      - name: Ensure the release tag matches every product version
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          node --input-type=module -e '
-            import manifest from "./package.json" with { type: "json" };
-            const expected = `v${manifest.version}`;
-            if (process.env.RELEASE_TAG !== expected) {
-              console.error(`Tag ${process.env.RELEASE_TAG} does not match ${expected}`);
-              process.exit(1);
-            }
-          '
+          ROOT_VERSION=$(node -p "require('./package.json').version")
+          CLI_VERSION=$(node -p "require('./apps/terminal/package.json').version")
+          LOCK_ROOT_VERSION=$(node -p "require('./package-lock.json').version")
+          LOCK_CLI_VERSION=$(node -p "require('./package-lock.json').packages['apps/terminal'].version")
+          GUI_VERSION=$(sed -n 's/^version = "\([^"]*\)"/\1/p' apps/native/Cargo.toml | head -n 1)
+          EXPECTED="v${ROOT_VERSION}"
+          if [[ "$ROOT_VERSION" != "$CLI_VERSION" || "$ROOT_VERSION" != "$LOCK_ROOT_VERSION" || "$CLI_VERSION" != "$LOCK_CLI_VERSION" || "$ROOT_VERSION" != "$GUI_VERSION" || "$RELEASE_TAG" != "$EXPECTED" ]]; then
+            printf 'Release tag/version mismatch: tag=%s root=%s lock-root=%s cli=%s lock-cli=%s gui=%s\n' "$RELEASE_TAG" "$ROOT_VERSION" "$LOCK_ROOT_VERSION" "$CLI_VERSION" "$LOCK_CLI_VERSION" "$GUI_VERSION" >&2
+            exit 1
+          fi
 
-      - name: Install terminal package dependencies
-        run: npm install --prefix apps/terminal --no-package-lock --ignore-scripts
-
+  terminal-cli:
+    needs: version-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install locked workspace dependencies
+        run: npm ci --ignore-scripts
       - name: Check CLI syntax
         run: npm run typecheck --prefix apps/terminal
-
       - name: Run CLI tests
         run: npm test --prefix apps/terminal
-
       - name: Pack CLI release asset
         run: npm pack ./apps/terminal --pack-destination "$RUNNER_TEMP"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terminal-cli
+          path: ${{ runner.temp }}/ahoy-player-terminal-*.tgz
+          if-no-files-found: error
+          retention-days: 1
 
-      - name: Publish GitHub Release
+  native-gui:
+    needs: version-check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            target: linux-x86_64
+          - runner: macos-15
+            target: mac-arm64
+          - runner: macos-15-intel
+            target: mac-x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libappindicator3-dev libasound2-dev libdbus-1-dev libfontconfig1-dev \
+            libgtk-3-dev libudev-dev libxdo-dev pkg-config \
+            libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libxcb-xkb-dev libxcursor-dev \
+            libxi-dev libxkbcommon-dev libxkbcommon-x11-0 libxrandr-dev
+
+      - name: Run native unit tests
+        if: runner.os == 'Linux'
+        run: cargo test --locked --workspace
+
+      - name: Build native GUI
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "12.0"
+        run: cargo build --locked --release -p ahoy-player
+
+      - name: Package Linux user install
+        if: runner.os == 'Linux'
+        run: packaging/linux/create-release-archive.sh "${GITHUB_REF_NAME#v}" target/release/ahoy-player "$RUNNER_TEMP"
+
+      - name: Create macOS app bundle
+        if: runner.os == 'macOS'
+        run: packaging/macos/create-app-bundle.sh "${GITHUB_REF_NAME#v}" target/release/ahoy-player "$RUNNER_TEMP"
+
+      - name: Sign and notarize macOS app
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP="$RUNNER_TEMP/Ahoy Player.app"
+          if [[ -z "$APPLE_CERTIFICATE_P12_BASE64" || -z "$APPLE_CERTIFICATE_PASSWORD" || -z "$APPLE_SIGNING_IDENTITY" || -z "$APPLE_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+            echo '::warning::Apple signing/notarization secrets are missing; the macOS release will be unsigned and require manual Gatekeeper approval.'
+            codesign --force --deep --sign - "$APP"
+            exit 0
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/ahoy-release.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
+          CERT_PATH="$RUNNER_TEMP/ahoy-developer-id.p12"
+          printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          codesign --force --deep --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/ahoy-player-notary.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/ahoy-player-notary.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "$APP"
+          rm "$RUNNER_TEMP/ahoy-player-notary.zip" "$CERT_PATH"
+          security delete-keychain "$KEYCHAIN_PATH"
+
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/Ahoy Player.app" "$RUNNER_TEMP/ahoy-player-v${GITHUB_REF_NAME#v}-${{ matrix.target }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-${{ matrix.target }}
+          path: ${{ runner.temp }}/ahoy-player-*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [terminal-cli, native-gui]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Generate SHA-256 checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - name: Publish all release assets
         uses: softprops/action-gh-release@v2
         with:
-          name: Ahoy Player ${{ github.ref_name }} — Terminal CLI
+          name: Ahoy Player ${{ github.ref_name }}
           generate_release_notes: true
-          files: ${{ runner.temp }}/ahoy-player-terminal-*.tgz
+          files: dist/*
           fail_on_unmatched_files: true

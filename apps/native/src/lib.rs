@@ -1,8 +1,9 @@
 pub mod app;
 pub mod audio;
+pub mod auth;
 pub mod files;
 pub mod layouts;
 pub mod library;
 pub mod metadata;
 pub mod themes;
-pub mod auth;
+pub mod updates;

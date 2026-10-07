@@ -1,6 +1,6 @@
 {
   "name": "@ahoy/player-terminal",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Ahoy Player's local-first terminal music player and TUI.",
   "license": "MIT",
   "repository": {

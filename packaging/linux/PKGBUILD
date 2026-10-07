@@ -6,7 +6,9 @@ arch=('x86_64')
 install=ahoy-player.install
 url='https://github.com/oooAHOYooo/ahoy-player'
 license=('MIT')
-depends=('alsa-lib' 'fontconfig' 'glibc' 'libxkbcommon' 'nodejs' 'wayland')
+makedepends=('pkgconf' 'rust')
+depends=('alsa-lib' 'curl' 'fontconfig' 'glibc' 'gtk3' 'libappindicator-gtk3'
+         'libxkbcommon' 'nodejs' 'wayland' 'xdo')
 optdepends=('mpv: audio playback and live song/remix/master mixing for the terminal companion'
             'ffmpeg: Terminal Art cover decoding and ffplay audio playback')
 source=("${pkgname}-${pkgver}.tar.gz")

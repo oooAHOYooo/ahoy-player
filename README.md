@@ -34,6 +34,8 @@ opens the terminal player. These shortcuts use the existing `start` command.
 
 The Linux binary is `target/release/ahoy-player`. It has native MP3 selection, SHA-256 duplicate detection, ID3 metadata with filename/folder fallbacks, local JSON persistence, and Rodio playback. Data lives below the platform local-data directory (normally `~/.local/share/ahoy-player`).
 
+The release workflow attaches matching GUI builds to [GitHub Releases](https://github.com/oooAHOYooo/ahoy-player/releases/latest). Linux x86_64 downloads include a user-local installer (`./install.sh`); macOS downloads are app bundles for Apple Silicon and Intel. The ahoy.ooo download page reads the current release assets directly from GitHub, so it follows published versions without a per-release page edit. The in-app update control checks GitHub Releases at startup (cached for 12 hours), then opens the matching release page so users can download and install the update themselves. The GUI currently checks for updates on x86_64 Linux and both supported macOS architectures; Linux needs `curl` for the check.
+
 Themes and layouts persist separately. Starter themes: Neutral, Winamp-inspired, Terminal green, Monochrome, and High contrast. Users can save, switch, import validated JSON, and export themes.
 
 ### Optional AHOY ID
@@ -72,7 +74,7 @@ An AppImage is not produced or advertised as installing `ahoy` globally. It need
 Install it once on macOS, Linux, or Windows with Node.js 20+:
 
 ```sh
-npm install --global https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.2.3/ahoy-player-terminal-0.2.3.tgz
+npm install --global https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.2.4/ahoy-player-terminal-0.2.4.tgz
 ```
 
 On macOS and Linux, you can also use the source installer:

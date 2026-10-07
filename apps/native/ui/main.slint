@@ -32,6 +32,7 @@ export component AppWindow inherits Window {
     in-out property <[string]> track-items: [];
     in-out property <string> now-playing: "Nothing queued";
     in-out property <string> status: "Ready";
+    in-out property <string> update-status: "Checking updates…";
     in-out property <string> theme-name: "Neutral";
     in-out property <string> ahoy-id: "";
     in-out property <bool> playing: false;
@@ -81,6 +82,8 @@ export component AppWindow inherits Window {
     callback toggle-repeat();
     callback close-window();
     callback minimize-window();
+    callback update-action();
+    callback request-playback(bool);
 
     background: root.background-color;
 
@@ -124,6 +127,7 @@ export component AppWindow inherits Window {
                 Text { text: "LOCAL MUSIC"; color: #738683; font-size: 9px; vertical-alignment: center; }
                 Text { text: ""; horizontal-stretch: 1; }
                 Text { text: root.status; color: #91aaa5; font-size: 10px; vertical-alignment: center; }
+                ActionButton { width: 118px; label: root.update-status; clicked => { root.update-action(); } }
                 ActionButton { label: root.show-library ? "Hide library" : "Show library"; clicked => { root.toggle-library(); } }
                 ActionButton { label: root.show-queue ? "Hide queue" : "Show queue"; clicked => { root.toggle-queue(); } }
             }
