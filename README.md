@@ -36,6 +36,8 @@ The Linux binary is `target/release/ahoy-player`. It has native MP3 selection, S
 
 The desktop library has a **Reload** button for changes made by the terminal player. Missing music files are labeled in the list. The player refuses to overwrite a library changed by another app while it was open; reload and retry the import. The playback bar shows duration and elapsed time for imported MP3s and supports seeking when duration is available.
 
+The desktop library has visible Tracks, Artists, and Albums browse choices and a search field. The selected playing track is highlighted in both the library and queue. Use Up/Down and Enter to select a library row, Space to pause, and Tab to reach buttons and sliders. The now-playing bar displays title, artist, album, and embedded or adjacent cover art when available; playback errors appear beside the library with a reload action.
+
 The release workflow attaches matching GUI builds to [GitHub Releases](https://github.com/oooAHOYooo/ahoy-player/releases/latest). Linux x86_64 downloads include a user-local installer (`./install.sh`); macOS downloads are app bundles for Apple Silicon and Intel. The ahoy.ooo download page reads the current release assets directly from GitHub, so it follows published versions without a per-release page edit. The in-app update control checks GitHub Releases at startup (cached for 12 hours), then opens the matching release page so users can download and install the update themselves. The GUI currently checks for updates on x86_64 Linux and both supported macOS architectures; Linux needs `curl` for the check.
 
 Themes and layouts persist separately. Starter themes: Neutral, Winamp-inspired, Terminal green, Monochrome, and High contrast. Users can save, switch, import validated JSON, and export themes.
@@ -146,6 +148,8 @@ playback and freezes on pause. Press **z** to turn motion off, or launch with
 elapsed time is estimated from the playback process clock and freezes on pause.
 Terminal emulators do not expose font coverage or DOM accessibility semantics;
 the fallback is explicit, with visible keyboard focus and text labels.
+
+In either TUI view, press **/** to search the visible library. Type a query, press Enter to keep the filter, or Esc to clear it. The result count stays visible. Press **?** for help matching the current player or remix mode. Narrow terminals use a compact text layout. A failed track is marked `!` in the list, with an error above it; `ahoy doctor` checks missing audio tools.
 
 Keyboard backlight control is available on Linux when the laptop exposes a
 `/sys/class/leds/*kbd_backlight` control. Check support and write permission with

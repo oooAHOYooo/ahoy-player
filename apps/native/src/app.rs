@@ -8,7 +8,7 @@ use crate::{
     updates::{self, UpdateInfo},
 };
 use anyhow::Result;
-use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
+use slint::{ComponentHandle, Image, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use std::{
     cell::RefCell, path::PathBuf, process::Command, rc::Rc, sync::mpsc::Receiver, time::Duration,
 };
@@ -22,6 +22,8 @@ struct State {
     layout: layouts::Layout,
     audio: Option<AudioPlayer>,
     queue: QueueState,
+    library_view: usize,
+    search_query: String,
     data_dir: PathBuf,
     auth: auth::Auth,
     auth_login_rx: Option<Receiver<anyhow::Result<String>>>,
@@ -86,6 +88,8 @@ pub fn run() -> Result<()> {
         layout,
         audio,
         queue,
+        library_view: 0,
+        search_query: String::new(),
         data_dir,
         auth,
         auth_login_rx: None,
@@ -324,6 +328,12 @@ pub fn run() -> Result<()> {
                     set_media_playback(&mut state, false);
                     window.set_playing(false);
                     window.set_now_playing("Nothing queued".into());
+                    window.set_now_title("Nothing queued".into());
+                    window.set_now_artist("".into());
+                    window.set_now_album("".into());
+                    window.set_has_artwork(false);
+                    window.set_current_track_id("".into());
+                    window.set_alert("".into());
                     window.set_playback_position(0.0);
                     window.set_playback_duration(0.0);
                     window.set_playback_time("0:00 / 0:00".into());
@@ -374,12 +384,48 @@ pub fn run() -> Result<()> {
     window.on_select_track(move |index| {
         if let Some(window) = weak.upgrade() {
             let mut state = state_select.borrow_mut();
-            if let Some(track) = state.library.tracks.get(index as usize).cloned() {
-                state.queue.index = Some(index as usize);
+            if let Some(actual_index) = visible_indices(&state).get(index as usize).copied() {
+                let track = state.library.tracks[actual_index].clone();
+                state.queue.index = Some(actual_index);
                 if play_track(&mut state, &window, &track) {
                     window.set_status("Playing".into());
                 }
             }
+        }
+    });
+
+    let weak = window.as_weak();
+    let state_queue_select = state.clone();
+    window.on_select_queue_track(move |index| {
+        if let Some(window) = weak.upgrade() {
+            let mut state = state_queue_select.borrow_mut();
+            if let Some(track) = state.library.tracks.get(index as usize).cloned() {
+                state.queue.index = Some(index as usize);
+                let _ = play_track(&mut state, &window, &track);
+            }
+        }
+    });
+
+    let weak = window.as_weak();
+    let state_search = state.clone();
+    window.on_search_changed(move |query| {
+        if let Some(window) = weak.upgrade() {
+            let mut state = state_search.borrow_mut();
+            state.search_query = query.to_string();
+            window.set_search_query(query);
+            window.set_keyboard_selected_index(0);
+            refresh(&window, &state);
+        }
+    });
+
+    let weak = window.as_weak();
+    let state_view = state.clone();
+    window.on_select_library_view(move |view| {
+        if let Some(window) = weak.upgrade() {
+            let mut state = state_view.borrow_mut();
+            state.library_view = (view as usize).min(2);
+            window.set_keyboard_selected_index(0);
+            refresh(&window, &state);
         }
     });
 
@@ -885,6 +931,7 @@ fn advance(weak: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>>, next: bool
             state.queue.playing = false;
             set_media_playback(&mut state, false);
             window.set_playing(false);
+            window.set_current_track_id("".into());
             window.set_status("End of queue".into());
         }
     }
@@ -940,6 +987,15 @@ fn play_track(state: &mut State, window: &AppWindow, track: &Track) -> bool {
             window.set_playback_duration(track.duration_ms.unwrap_or(0) as f32 / 1000.0);
             state.queue.playing = true;
             window.set_now_playing(format!("{} — {}", track.artist, track.title).into());
+            window.set_now_title(track.title.clone().into());
+            window.set_now_artist(track.artist.clone().into());
+            window.set_now_album(track.album.clone().into());
+            if let Some(image) = cover_image(track, &state.data_dir) {
+                window.set_now_artwork(image);
+                window.set_has_artwork(true);
+            } else { window.set_has_artwork(false); }
+            window.set_current_track_id(track.id.clone().into());
+            window.set_alert("".into());
             window.set_playing(true);
             set_media_metadata(state, track);
             set_media_playback(state, true);
@@ -950,6 +1006,11 @@ fn play_track(state: &mut State, window: &AppWindow, track: &Track) -> bool {
             set_media_playback(state, false);
             window.set_playing(false);
             window.set_status(format!("Could not play track: {error}").into());
+            window.set_alert(if track.path.is_file() {
+                format!("Could not play {}: {error}. Check the audio output, then try again.", track.title)
+            } else {
+                format!("{} is missing. Restore the file at {} and reload the library.", track.title, track.path.display())
+            }.into());
             false
         }
     }
@@ -957,6 +1018,33 @@ fn play_track(state: &mut State, window: &AppWindow, track: &Track) -> bool {
 
 fn clock_label(seconds: u64) -> String {
     format!("{}:{:02}", seconds / 60, seconds % 60)
+}
+
+fn cover_image(track: &Track, data_dir: &std::path::Path) -> Option<Image> {
+    use lofty::prelude::TaggedFileExt;
+    if let Ok(tagged) = lofty::read_from_path(&track.path) {
+        if let Some(picture) = tagged.primary_tag().or_else(|| tagged.first_tag()).and_then(|tag| tag.pictures().first()) {
+            let bytes = picture.data();
+            if bytes.len() <= 10_000_000 {
+                let extension = if bytes.starts_with(&[0xff, 0xd8, 0xff]) { "jpg" }
+                    else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { "png" }
+                    else { "" };
+                if !extension.is_empty() {
+                    let cache = data_dir.join("artwork-cache").join(format!("{}.{}", track.fingerprint, extension));
+                    if !cache.exists() {
+                        std::fs::create_dir_all(cache.parent()?).ok()?;
+                        std::fs::write(&cache, bytes).ok()?;
+                    }
+                    if let Ok(image) = Image::load_from_path(&cache) { return Some(image); }
+                }
+            }
+        }
+    }
+    let directory = track.path.parent()?;
+    for name in ["cover.jpg", "cover.png", "folder.jpg", "folder.png"] {
+        if let Ok(image) = Image::load_from_path(&directory.join(name)) { return Some(image); }
+    }
+    None
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -988,28 +1076,32 @@ fn set_media_playback(state: &mut State, playing: bool) {
 #[cfg(target_os = "windows")]
 fn set_media_playback(_state: &mut State, _playing: bool) {}
 
+fn visible_indices(state: &State) -> Vec<usize> {
+    let query = state.search_query.trim().to_lowercase();
+    let mut indices: Vec<usize> = state.library.tracks.iter().enumerate().filter_map(|(index, track)| {
+        let matches = query.is_empty() || [&track.title, &track.artist, &track.album].iter().any(|field| field.to_lowercase().contains(&query));
+        matches.then_some(index)
+    }).collect();
+    if state.library_view == 1 { indices.sort_by_key(|index| (state.library.tracks[*index].artist.to_lowercase(), state.library.tracks[*index].album.to_lowercase(), state.library.tracks[*index].title.to_lowercase())); }
+    if state.library_view == 2 { indices.sort_by_key(|index| (state.library.tracks[*index].album.to_lowercase(), state.library.tracks[*index].artist.to_lowercase(), state.library.tracks[*index].title.to_lowercase())); }
+    indices
+}
+
+fn track_label(track: &Track) -> SharedString {
+    format!("{} — {}  [{}{}]", track.artist, track.title, track.album, if track.path.is_file() { "" } else { " · File missing" }).into()
+}
+
 fn refresh(window: &AppWindow, state: &State) {
-    let items: Vec<SharedString> = state
-        .library
-        .tracks
-        .iter()
-        .enumerate()
-        .map(|(index, track)| {
-            format!(
-                "{:>3}  {} — {}  [{}]",
-                index + 1,
-                track.artist,
-                track.title,
-                if track.path.is_file() {
-                    track.album.clone()
-                } else {
-                    format!("{} · File missing", track.album)
-                }
-            )
-            .into()
-        })
-        .collect();
+    let visible = visible_indices(state);
+    let items: Vec<SharedString> = visible.iter().map(|index| track_label(&state.library.tracks[*index])).collect();
+    let ids: Vec<SharedString> = visible.iter().map(|index| state.library.tracks[*index].id.clone().into()).collect();
+    let queue_items: Vec<SharedString> = state.library.tracks.iter().map(track_label).collect();
+    let queue_ids: Vec<SharedString> = state.library.tracks.iter().map(|track| track.id.clone().into()).collect();
     window.set_track_items(ModelRc::new(VecModel::from(items)));
+    window.set_track_ids(ModelRc::new(VecModel::from(ids)));
+    window.set_queue_items(ModelRc::new(VecModel::from(queue_items)));
+    window.set_queue_ids(ModelRc::new(VecModel::from(queue_ids)));
+    window.set_library_view(state.library_view as i32);
     window.set_theme_name(state.themes[state.theme_index].name.clone().into());
     window.set_show_library(
         state

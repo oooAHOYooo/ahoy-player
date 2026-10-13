@@ -1,4 +1,4 @@
-import { Button, CheckBox, HorizontalBox, VerticalBox, Slider, ListView } from "std-widgets.slint";
+import { Button, CheckBox, HorizontalBox, VerticalBox, Slider, ListView, LineEdit } from "std-widgets.slint";
 
 component ActionButton inherits Rectangle {
     in property <string> label;
@@ -7,8 +7,8 @@ component ActionButton inherits Rectangle {
     height: 36px;
     min-width: 42px;
     background: accent ? (hit.has-hover ? #9af0c1 : #83dfb0) : (hit.has-hover ? #293c3b : #1b2929);
-    border-color: accent ? #83dfb0 : #344746;
-    border-width: 1px;
+    border-color: button-focus.has-focus ? #ffffff : (accent ? #83dfb0 : #344746);
+    border-width: button-focus.has-focus ? 2px : 1px;
     border-radius: 8px;
     Text {
         text: root.label;
@@ -18,7 +18,13 @@ component ActionButton inherits Rectangle {
         horizontal-alignment: center;
         vertical-alignment: center;
     }
-    hit := TouchArea { clicked => { root.clicked(); } }
+    button-focus := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == " ") { root.clicked(); return accept; }
+            return reject;
+        }
+        hit := TouchArea { clicked => { button-focus.focus(); root.clicked(); } }
+    }
 }
 
 export component AppWindow inherits Window {
@@ -30,6 +36,19 @@ export component AppWindow inherits Window {
     preferred-height: 860px;
 
     in-out property <[string]> track-items: [];
+    in-out property <[string]> track-ids: [];
+    in-out property <[string]> queue-items: [];
+    in-out property <[string]> queue-ids: [];
+    in-out property <string> current-track-id: "";
+    in-out property <string> search-query: "";
+    in-out property <int> library-view: 0;
+    in-out property <int> keyboard-selected-index: 0;
+    in-out property <string> alert: "";
+    in-out property <string> now-title: "Nothing queued";
+    in-out property <string> now-artist: "";
+    in-out property <string> now-album: "";
+    in-out property <image> now-artwork;
+    in-out property <bool> has-artwork: false;
     in-out property <string> now-playing: "Nothing queued";
     in-out property <string> status: "Ready";
     in-out property <string> update-status: "Checking updates…";
@@ -64,6 +83,9 @@ export component AppWindow inherits Window {
     callback import-files();
     callback reload-library();
     callback select-track(int);
+    callback select-queue-track(int);
+    callback search-changed(string);
+    callback select-library-view(int);
     callback toggle-play();
     callback next-track();
     callback previous-track();
@@ -95,6 +117,9 @@ export component AppWindow inherits Window {
     FocusScope {
         init => { self.focus(); }
         key-pressed(event) => {
+            if (event.text == Key.DownArrow && root.track-items.length > 0) { root.keyboard-selected-index = min(root.keyboard-selected-index + 1, root.track-items.length - 1); return accept; }
+            if (event.text == Key.UpArrow && root.track-items.length > 0) { root.keyboard-selected-index = max(root.keyboard-selected-index - 1, 0); return accept; }
+            if (event.text == Key.Return && root.track-items.length > 0) { root.select-track(root.keyboard-selected-index); return accept; }
             if (event.text == " ") { root.toggle-play(); return accept; }
             if (event.text == Key.RightArrow) { root.next-track(); return accept; }
             if (event.text == Key.LeftArrow) { root.previous-track(); return accept; }
@@ -156,8 +181,7 @@ export component AppWindow inherits Window {
                             border-radius: 8px;
                             HorizontalBox { padding-left: 11px; Text { text: "♫   All music"; color: root.text-color; font-size: 12px; vertical-alignment: center; } }
                         }
-                        Text { text: "◷   Recently added"; color: #a1b2ae; font-size: 11px; }
-                        Text { text: "♡   Favorites"; color: #a1b2ae; font-size: 11px; }
+                        Text { text: "Browse and search your local files in the library."; color: #a1b2ae; font-size: 10px; wrap: word-wrap; }
                         Rectangle { height: 1px; background: root.border-color; }
                         Text { text: "PLAYLISTS"; color: #718681; font-size: 9px; font-weight: 700; }
                         Text { text: "Your playlists will live here"; color: #718681; font-size: 10px; wrap: word-wrap; }
@@ -188,7 +212,32 @@ export component AppWindow inherits Window {
                         ActionButton { label: "＋  Add music"; accent: true; clicked => { root.import-files(); } }
                     }
 
-                    if root.track-items.length == 0: Rectangle {
+                    HorizontalBox {
+                        height: 38px;
+                        spacing: 8px;
+                        ActionButton { label: "Tracks"; accent: root.library-view == 0; clicked => { root.select-library-view(0); } }
+                        ActionButton { label: "Artists"; accent: root.library-view == 1; clicked => { root.select-library-view(1); } }
+                        ActionButton { label: "Albums"; accent: root.library-view == 2; clicked => { root.select-library-view(2); } }
+                        Text { text: ""; horizontal-stretch: 1; }
+                        LineEdit { width: 230px; placeholder-text: "Search tracks, artists, albums"; text: root.search-query; edited(value) => { root.search-changed(value); } }
+                    }
+
+                    if root.alert != "": Rectangle {
+                        height: 48px;
+                        background: #3b281d;
+                        border-color: #a66a43;
+                        border-width: 1px;
+                        border-radius: 8px;
+                        HorizontalBox {
+                            padding-left: 12px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            Text { text: root.alert; color: #ffe4cc; font-size: 10px; wrap: word-wrap; horizontal-stretch: 1; vertical-alignment: center; }
+                            ActionButton { label: "Reload"; clicked => { root.reload-library(); } }
+                        }
+                    }
+
+                    if root.queue-items.length == 0: Rectangle {
                         vertical-stretch: 1;
                         background: root.surface-color;
                         border-color: root.border-color;
@@ -212,7 +261,7 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    if root.track-items.length > 0: Rectangle {
+                    if root.queue-items.length > 0: Rectangle {
                         vertical-stretch: 1;
                         background: root.surface-color;
                         border-color: root.border-color;
@@ -223,7 +272,7 @@ export component AppWindow inherits Window {
                             spacing: 8px;
                             HorizontalBox {
                                 height: 32px;
-                                Text { text: "All tracks"; color: root.text-color; font-size: 14px; font-weight: 700; vertical-alignment: center; }
+                                Text { text: root.library-view == 1 ? "By artist" : (root.library-view == 2 ? "By album" : "All tracks"); color: root.text-color; font-size: 14px; font-weight: 700; vertical-alignment: center; }
                                 Text { text: ""; horizontal-stretch: 1; }
                                 Text { text: root.track-items.length + " tracks"; color: #8a9c98; font-size: 10px; vertical-alignment: center; }
                             }
@@ -241,19 +290,20 @@ export component AppWindow inherits Window {
                             ListView {
                                 for track[index] in root.track-items: Rectangle {
                                     height: 42px;
-                                    background: row.has-hover ? #203332 : #00000000;
+                                    background: root.track-ids[index] == root.current-track-id ? #204638 : (index == root.keyboard-selected-index ? #203633 : (row.has-hover ? #203332 : #00000000));
                                     border-radius: 6px;
                                     row := TouchArea {
                                         HorizontalBox {
                                             padding-left: 10px;
                                             padding-right: 10px;
-                                            Text { text: (index + 1) + ""; width: 42px; color: #82928f; font-size: 10px; vertical-alignment: center; }
-                                            Text { text: track; color: root.text-color; font-size: 11px; vertical-alignment: center; overflow: elide; }
+                                            Text { text: root.track-ids[index] == root.current-track-id ? (root.playing ? "▶" : "Ⅱ") : (index + 1) + ""; width: 42px; color: root.accent-color; font-size: 10px; vertical-alignment: center; }
+                                            Text { text: track; color: root.track-ids[index] == root.current-track-id ? #ffffff : root.text-color; font-size: 11px; vertical-alignment: center; overflow: elide; }
                                         }
-                                        clicked => { root.select-track(index); }
+                                        clicked => { root.keyboard-selected-index = index; root.select-track(index); }
                                     }
                                 }
                             }
+                            if root.track-items.length == 0: Text { text: "No matches. Try another search."; color: #9aaba6; font-size: 11px; horizontal-alignment: center; }
                         }
                     }
 
@@ -304,26 +354,26 @@ export component AppWindow inherits Window {
                             height: 30px;
                             Text { text: "Up next"; color: root.text-color; font-size: 14px; font-weight: 700; vertical-alignment: center; }
                             Text { text: ""; horizontal-stretch: 1; }
-                            Text { text: root.track-items.length + ""; color: #8a9c98; font-size: 10px; vertical-alignment: center; }
+                            Text { text: root.queue-items.length + ""; color: #8a9c98; font-size: 10px; vertical-alignment: center; }
                         }
                         Rectangle { height: 1px; background: root.border-color; }
                         ListView {
-                            for track[index] in root.track-items: Rectangle {
+                            for track[index] in root.queue-items: Rectangle {
                                 height: 42px;
-                                background: queue-row.has-hover ? #203332 : #00000000;
+                                background: root.queue-ids[index] == root.current-track-id ? #204638 : (queue-row.has-hover ? #203332 : #00000000);
                                 border-radius: 6px;
                                 queue-row := TouchArea {
                                     HorizontalBox {
                                         padding-left: 8px;
                                         padding-right: 8px;
-                                        Text { text: (index + 1) + ""; width: 26px; color: #718681; font-size: 9px; vertical-alignment: center; }
+                                        Text { text: root.queue-ids[index] == root.current-track-id ? (root.playing ? "▶" : "Ⅱ") : (index + 1) + ""; width: 26px; color: root.accent-color; font-size: 9px; vertical-alignment: center; }
                                         Text { text: track; color: #c2cfca; font-size: 10px; vertical-alignment: center; overflow: elide; }
                                     }
-                                    clicked => { root.select-track(index); }
+                                    clicked => { root.select-queue-track(index); }
                                 }
                             }
                         }
-                        if root.track-items.length == 0: VerticalBox {
+                        if root.queue-items.length == 0: VerticalBox {
                             alignment: center;
                             Text { text: "Nothing queued yet"; color: #a1b2ae; font-size: 11px; horizontal-alignment: center; }
                             Text { text: "Add music to build your queue."; color: #718681; font-size: 9px; horizontal-alignment: center; }
@@ -338,16 +388,25 @@ export component AppWindow inherits Window {
             Rectangle { height: 1px; background: root.border-color; }
 
             Rectangle {
-                height: 82px;
+                height: 114px;
                 background: #101819;
                 HorizontalBox {
                     padding-left: 24px;
                     padding-right: 24px;
-                    spacing: 16px;
+                    spacing: 12px;
+                    Rectangle {
+                        width: 68px;
+                        height: 68px;
+                        background: #183b33;
+                        border-radius: 8px;
+                        if root.has-artwork: Image { source: root.now-artwork; image-fit: contain; }
+                        if !root.has-artwork: Text { text: "♫"; color: root.accent-color; font-size: 30px; horizontal-alignment: center; vertical-alignment: center; }
+                    }
                     VerticalBox {
                         spacing: 4px;
                         Text { text: "NOW PLAYING"; color: root.accent-color; font-size: 8px; font-weight: 700; }
-                        Text { text: root.now-playing; color: root.text-color; font-size: 12px; font-weight: 600; overflow: elide; }
+                        Text { text: root.now-title; color: root.text-color; font-size: 13px; font-weight: 600; overflow: elide; }
+                        Text { text: root.now-artist + (root.now-album == "" ? "" : " · " + root.now-album); color: #b1c2bc; font-size: 10px; overflow: elide; }
                         Text { text: root.playback-duration > 0 ? root.playback-time : (root.playing ? "Playing from your library" : "Choose a track to start listening"); color: #82928f; font-size: 9px; }
                         Slider { minimum: 0; maximum: root.playback-duration > 0 ? root.playback-duration : 1; value: root.playback-position; enabled: root.playback-duration > 0; changed(value) => { root.seek-to(value); } }
                     }

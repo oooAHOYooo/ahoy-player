@@ -803,6 +803,21 @@ async function tui() {
   let artWorker, artKey = "", artId = 0, artwork = null, artMetadata = {}, artMessage = "", loadingSince = 0;
   let startedAt = 0, elapsedBeforePause = 0, focus = -1, launching = false;
   let repeatQueue = false;
+  let searchQuery = "", searching = false, showHelp = false, playbackError = "", errorTrackId = "";
+  const visibleIndices = () => {
+    const query = searchQuery.trim().toLowerCase();
+    return tracks.flatMap((track, index) => `${track.title} ${track.artist} ${track.album}`.toLowerCase().includes(query) ? [index] : []);
+  };
+  const moveSelection = (direction) => {
+    const visible = visibleIndices();
+    if (!visible.length) return;
+    const position = visible.indexOf(selected);
+    selected = visible[Math.max(0, Math.min(visible.length - 1, (position < 0 ? 0 : position) + direction))];
+  };
+  const searchLine = () => `${searching ? "Search › " : "Search / "}${searchQuery || (searching ? "_" : "")}${searchQuery ? `  ·  ${visibleIndices().length}/${tracks.length} matches` : ""}`;
+  const helpLines = () => remixMode
+    ? ["REMIX KEYS", "Q–I notes · Shift synth · [ ] scale · ; sound", "0/9 mute · 1–4 levels · 5–7 effects", "Space pause · Tab/Esc leave remix · ? close help"]
+    : ["PLAYER KEYS", "/ search · Enter play · ↑/↓ or J/K browse", "Space pause · [ ] previous/next · V artwork", "S scan · R repeat · M remix · B ASCII · Z motion", "? close help · X quit"];
   const elapsed = () => elapsedBeforePause + (child && !paused ? (performance.now() - startedAt) / 1000 : 0);
   const requestArt = (track, columns) => {
     const key = `${track.path}:${columns}`;
@@ -820,13 +835,14 @@ async function tui() {
   };
   const renderTerminal = (track, active) => {
     const width = Math.max(16, (process.stdout.columns || 80) - 2), height = process.stdout.rows || 24;
-    const queueRows = Math.min(tracks.length, height < 32 ? 1 : 5);
+    const visible = visibleIndices();
+    const queueRows = Math.min(visible.length, height < 32 ? 1 : 5);
     const columns = artColumns(width, height - (width < 64 ? 6 : 3) - queueRows - (remixMode ? 3 : 0));
     requestArt(track, columns);
     const lines = [];
     const textLine = (value) => crop(terminalText(value), width);
     const deckHeader = ahoyId ? `AHOY / LIVE DECK — ⚓ AHOY ID: ${ahoyId}` : "AHOY / LIVE DECK";
-    lines.push(accent(deckHeader), dim(textLine("↑↓ select · enter play · space pause · m remix · v waveform · x quit")), dim("═".repeat(width)),
+    lines.push(accent(deckHeader), dim(textLine("↑↓ browse · Enter play · Space pause · / search · ? help")), dim("═".repeat(width)),
       textLine(channelMixLine(width)),
       accent(active ? "▶  NOW PLAYING" : paused ? "Ⅱ  PAUSED" : "○  READY"));
     if (remixMode) lines.push(textLine(`REMIX ${remixScales[remixScaleIndex].name} · ${remixSounds[remixSoundIndex]} · Z–M/A–L piano · Shift synth · Tab/Esc back`));
@@ -848,20 +864,44 @@ async function tui() {
       textLine(`[${"=".repeat(filled)}${"-".repeat(barWidth - filled)}]`),
       ...controlLines,
       dim(textLine(remixMode ? "[ ] scale · ; sound · 0/9 mute · 1–4 layer level · 5–7 FX" : "Tab focus · Enter activate · b Braille/ASCII")),
-      textLine(mixerLine()), dim(textLine(mixHelp())), dim("─".repeat(width)));
-    const start = Math.max(0, Math.min(selected - Math.floor(queueRows / 2), tracks.length - queueRows));
-    tracks.slice(start, start + queueRows).forEach((item, offset) => {
-      const index = start + offset;
+      textLine(mixerLine()), dim(textLine(playbackError || mixHelp())), dim("─".repeat(width)), accent(textLine(searchLine())));
+    const selectedPosition = Math.max(0, visible.indexOf(selected));
+    const start = Math.max(0, Math.min(selectedPosition - Math.floor(queueRows / 2), visible.length - queueRows));
+    visible.slice(start, start + queueRows).forEach((index) => {
+      const item = tracks[index];
       const marker = index === selected ? ">" : " ";
-      const playing = active && currentTrack?.id === item.id ? ">" : " ";
-      lines.push(textLine(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${item.title} — ${item.artist}`));
+      const playing = currentTrack?.id === item.id ? (paused ? "Ⅱ" : ">") : " ";
+      lines.push(textLine(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${item.title} — ${item.artist}${errorTrackId === item.id ? "  !" : ""}`));
     });
-    lines.push(dim(textLine(`${tracks.length} local tracks · ${libraryPath}`)));
+    if (!visible.length) lines.push(dim(textLine("No matches. Backspace to edit or Esc to clear search.")));
     // Artwork is static; only the missing-cover CD animates during playback.
     process.stdout.write(`\x1b[0m\x1b[H${lines.slice(0, Math.max(1, height - 1)).map((line) => `${line}\x1b[K`).join("\n")}\x1b[J`);
   };
+  const renderCompact = () => {
+    const width = Math.max(16, (process.stdout.columns || 80) - 2), height = process.stdout.rows || 24;
+    const visible = visibleIndices();
+    const track = currentTrack || tracks[selected];
+    const lines = ["AHOY / PLAYER", `${child ? (paused ? "Ⅱ PAUSED" : "▶ PLAYING") : "○ READY"}  ${track?.title || "No track"}`,
+      `${track?.artist || ""} · ${track?.album || ""}`, currentTrack ? `${clockLabel(elapsed())} / ${clockLabel(currentDuration)}` : "Enter plays selected track",
+      searchLine(), playbackError || mixer.status || "↑↓ browse · Enter play · Space pause", "? help · / search · X quit", "─".repeat(width)];
+    const room = Math.max(0, height - lines.length - 1);
+    const selectedPosition = Math.max(0, visible.indexOf(selected));
+    const start = Math.max(0, Math.min(selectedPosition - Math.floor(room / 2), visible.length - room));
+    for (const index of visible.slice(start, start + room)) {
+      const item = tracks[index];
+      lines.push(`${index === selected ? ">" : " "}${currentTrack?.id === item.id ? (paused ? "Ⅱ" : "▶") : " "} ${item.title} — ${item.artist}${errorTrackId === item.id ? "  !" : ""}`);
+    }
+    if (!visible.length) lines.push("No matches. Backspace or Esc to clear.");
+    process.stdout.write(`\x1b[0m\x1b[H${lines.slice(0, Math.max(1, height - 1)).map((line) => `${crop(terminalText(line), width)}\x1b[K`).join("\n")}\x1b[J`);
+  };
+  const renderHelp = () => {
+    const width = Math.max(16, (process.stdout.columns || 80) - 2);
+    const lines = helpLines();
+    process.stdout.write(`\x1b[0m\x1b[H${lines.map((line) => `${crop(terminalText(line), width)}\x1b[K`).join("\n")}\x1b[J`);
+  };
   const render = () => {
     if (closed) return;
+    if (showHelp) { renderHelp(); return; }
     if (!tracks.length) {
       const width = Math.max(1, (process.stdout.columns || 80) - 2);
       const height = process.stdout.rows || 24;
@@ -882,12 +922,13 @@ async function tui() {
     }
     const active = Boolean(child && !child.killed && !paused);
     const track = currentTrack ?? tracks[selected];
+    if ((process.stdout.columns || 80) < 64 || (process.stdout.rows || 24) < 18) { renderCompact(); return; }
     if (terminalMode) { renderTerminal(track, active); return; }
     process.stdout.write("\x1b[0m");
     clearScreen();
     const width = Math.max(40, (process.stdout.columns || 86) - 4);
     const deckHeader = ahoyId ? `AHOY / LIVE DECK — ⚓ AHOY ID: ${ahoyId}` : "AHOY / LIVE DECK";
-    console.log(accent(crop(`${deckHeader}  ·  s scan · ↑↓ browse · enter play · space pause · m remix · x quit`, width)));
+    console.log(accent(crop(`${deckHeader}  ·  / search · ? help · ↑↓ browse · enter play · space pause`, width)));
     console.log(dim("═".repeat(width)));
     console.log(channelMixLine(width));
     console.log(`${accent(active ? "▶ NOW PLAYING" : paused ? "Ⅱ PAUSED" : "READY")}  ${crop(track.title, Math.max(1, width - 38))}  ${dim(`— ${track.artist}`)}`);
@@ -903,22 +944,27 @@ async function tui() {
     console.log(`Volume  [${accent("■".repeat(volumeFilled))}${dim("─".repeat(volumeWidth - volumeFilled))}]  ${mixer.levels.master}%  ${dim("+ / -")}`);
     if (remixMode) console.log(formatPianoDeck(width, lastNote, { echo: sfxEcho, chorus: sfxChorus, lofi: sfxLoFi, mutedSong: mixer.muted.song, mutedRemix: mixer.muted.remix }, mixer.levels.song / 100, mixer.levels.remix / 100, remixScales[remixScaleIndex], remixSounds[remixSoundIndex], recentAction));
     else console.log(dim("─".repeat(width)));
-    console.log(accent("LIBRARY") + dim(`  ${tracks.length} songs`));
+    const visible = visibleIndices();
+    console.log(accent("LIBRARY") + dim(`  ${visible.length}/${tracks.length} songs`));
+    console.log(accent(crop(searchLine(), width)));
+    if (playbackError) console.log(accent(crop(playbackError, width)));
     console.log(dim(`${" ".repeat(7)}${"ARTIST".padEnd(Math.min(24, Math.max(10, Math.floor((width - 16) / 4))))}  SONG TITLE`));
     console.log(dim("─".repeat(width)));
-    const rows = Math.max(1, (process.stdout.rows || 24) - (remixMode ? (width < 62 ? 18 : 20) : 14));
-    const start = Math.max(0, Math.min(selected - Math.floor(rows / 2), tracks.length - rows));
+    const rows = Math.max(1, (process.stdout.rows || 24) - (remixMode ? (width < 62 ? 18 : 20) : 16));
+    const selectedPosition = Math.max(0, visible.indexOf(selected));
+    const start = Math.max(0, Math.min(selectedPosition - Math.floor(rows / 2), visible.length - rows));
     const artistWidth = Math.min(24, Math.max(10, Math.floor((width - 16) / 4)));
     const titleWidth = Math.max(10, width - artistWidth - 12);
-    tracks.slice(start, start + rows).forEach((item, offset) => {
-      const index = start + offset;
+    visible.slice(start, start + rows).forEach((index) => {
+      const item = tracks[index];
       const marker = index === selected ? accent("›") : " ";
-      const playing = active && currentTrack?.id === item.id ? accent("▶") : " ";
-      console.log(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${dim(crop(item.artist, artistWidth).padEnd(artistWidth))}  ${crop(item.title, titleWidth)}`);
+      const playing = currentTrack?.id === item.id ? accent(paused ? "Ⅱ" : "▶") : " ";
+      console.log(`${marker}${playing} ${String(index + 1).padStart(3, " ")}  ${dim(crop(item.artist, artistWidth).padEnd(artistWidth))}  ${crop(item.title, titleWidth)}${errorTrackId === item.id ? " !" : ""}`);
     });
+    if (!visible.length) console.log(dim("No matches. Backspace to edit or Esc to clear search."));
     const footer = remixMode
       ? "Piano · Shift synth · [ ] scale · ; sound · 0/9 mute · 1–4 mix · Tab/Esc back"
-      : "Up/Down Browse  Enter Play  Space Pause  S Scan  M Remix  R Repeat  Q Quit";
+      : "↑↓ Browse  Enter Play  Space Pause  / Search  ? Help  X Quit";
     console.log(dim(crop(footer, width)));
   };
 
@@ -944,11 +990,14 @@ async function tui() {
     stop(); currentTrack = tracks[selected];
     try {
       const trackBeingStarted = currentTrack;
+      if (!existsSync(trackBeingStarted.path)) throw new Error(`Missing file: ${trackBeingStarted.path}. Restore it, then press Enter.`);
       const knownDuration = Number(trackBeingStarted.duration_ms) / 1000;
       currentDuration = Number.isFinite(knownDuration) && knownDuration > 0 ? knownDuration : NaN;
       const playingChild = await playTrack(trackBeingStarted, { quiet: true, mixer });
       if (closed) { playingChild.kill(); return; }
       child = playingChild; startedAt = performance.now();
+      playbackError = "";
+      errorTrackId = "";
       if (!Number.isFinite(currentDuration)) {
         void probeTrackDuration(trackBeingStarted.path).then((duration) => {
           if (duration && currentTrack?.id === trackBeingStarted.id) { currentDuration = duration; render(); }
@@ -965,7 +1014,12 @@ async function tui() {
         } else render();
       };
       child.once("exit", finish); child.once("error", finish);
-    } catch (error) { currentTrack = null; artMessage = terminalText(error.message); }
+    } catch (error) {
+      errorTrackId = currentTrack?.id || "";
+      currentTrack = null;
+      playbackError = terminalText(error.message + (error.message.includes("Audio player not found") ? " Run ahoy doctor." : ""));
+      render();
+    }
     finally { launching = false; }
   };
   const skip = async (offset) => { selected = Math.max(0, Math.min(tracks.length - 1, (currentTrack ? tracks.indexOf(currentTrack) : selected) + offset)); await startSelected(); };
@@ -1029,6 +1083,22 @@ async function tui() {
   const onKey = async (key) => {
     if (wizardActive) return;
     const value = key.toString();
+    if (value === "\u0003") { await shutdown(130); return; }
+    if (showHelp) {
+      if (value === "?" || value === "\u001b") showHelp = false;
+      render(); return;
+    }
+    if (searching) {
+      if (value === "\u001b") { searching = false; searchQuery = ""; }
+      else if (value === "\r" || value === "\n") searching = false;
+      else if (value === "\u007f" || value === "\b") searchQuery = searchQuery.slice(0, -1);
+      else if (/^[\x20-\x7e]+$/.test(value)) searchQuery += value;
+      const visible = visibleIndices();
+      if (visible.length && !visible.includes(selected)) selected = visible[0];
+      render(); return;
+    }
+    if (value === "?") { showHelp = true; render(); return; }
+    if (!remixMode && value === "/") { searching = true; render(); return; }
     if (remixMode && value !== "\u0003") {
       if (value === "\u001b" || value === "\t") {
         remixMode = false;
@@ -1136,9 +1206,9 @@ async function tui() {
     if (terminalMode && value === "\t") focus = (focus + 1) % 4;
     if (terminalMode && value === "\u001b[Z") focus = (focus + 3) % 4;
     if (value === "\u001b[A" || value === "\u001b[B") focus = -1;
-    if (value === "\u001b[A" || (!remixMode && value === "k")) selected = Math.max(0, selected - 1);
-    if (value === "\u001b[B" || (!remixMode && value === "j")) selected = Math.min(tracks.length - 1, selected + 1);
-    if (value === " ") { if (terminalMode && !child) await startSelected(); else pauseOrResume(); }
+    if (value === "\u001b[A" || (!remixMode && value === "k")) moveSelection(-1);
+    if (value === "\u001b[B" || (!remixMode && value === "j")) moveSelection(1);
+    if (value === " ") { if (terminalMode && !child && visibleIndices().includes(selected)) await startSelected(); else pauseOrResume(); }
     if (value === "m" || (!remixMode && value === "M")) { remixMode = !remixMode; render(); return; }
     const alias = { "\u001b[D": "1", "\u001b[C": "2" }[value];
     if (alias) { mixer.adjust(alias); render(); return; }
@@ -1146,7 +1216,7 @@ async function tui() {
     if (terminalMode && value === "[") await skip(-1);
     if (terminalMode && value === "]") await skip(1);
     if (value === "\r") {
-      if (!terminalMode || focus < 0) await startSelected();
+      if ((!terminalMode || focus < 0) && visibleIndices().includes(selected)) await startSelected();
       else if (focus === 0) await skip(-1);
       else if (focus === 1) { if (child) pauseOrResume(); else await startSelected(); }
       else if (focus === 2) await skip(1);
