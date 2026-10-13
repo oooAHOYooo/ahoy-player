@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { connect } from "node:net";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 
 const bindings = { "1": ["song", -5], "2": ["song", 5], "3": ["remix", -5], "4": ["remix", 5], "8": ["master", -5], "9": ["master", 5] };
@@ -54,7 +54,7 @@ export class AudioMixer {
   update = Promise.resolve();
 
   async launch(player, path, channel, stdio = "ignore") {
-    const directory = player.command === "mpv" ? await mkdtemp(join(tmpdir(), "ahoy-mix-")) : null;
+    const directory = player.command === "mpv" && platform() !== "win32" ? await mkdtemp(join(tmpdir(), "ahoy-mix-")) : null;
     if (this.closed) { if (directory) await rm(directory, { recursive: true, force: true }); throw new Error("Mixer closed"); }
     const socketPath = directory ? join(directory, "control.sock") : null;
     const args = [...player.baseArgs, ...volumeArgs(player.command, channelVolume(this.levels, channel, this.muted[channel])),
@@ -70,7 +70,9 @@ export class AudioMixer {
     };
     child.once("exit", cleanup); child.once("error", cleanup);
     await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
-    if (!socketPath) this.status = "Install mpv for live mixing; levels apply on next playback.";
+    if (!socketPath) this.status = platform() === "win32"
+      ? "Live mixing is unavailable on Windows; levels apply on next playback."
+      : "Install mpv for live mixing; levels apply on next playback.";
     return child;
   }
 

@@ -16,6 +16,7 @@ slint::include_modules!();
 
 struct State {
     library: Library,
+    library_revision: Option<String>,
     themes: Vec<Theme>,
     theme_index: usize,
     layout: layouts::Layout,
@@ -58,7 +59,9 @@ pub fn run() -> Result<()> {
     let data_dir = dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("ahoy-player");
-    let library = Library::load(&data_dir.join("library.json"))?;
+    let library_path = data_dir.join("library.json");
+    let library = Library::load(&library_path)?;
+    let library_revision = Library::revision(&library_path)?;
     let themes = themes::load(&data_dir.join("themes.json"))?;
     let layout = layouts::load(&data_dir.join("layout.json"))?;
     let auth = auth::load(&data_dir.join("auth.json")).unwrap_or_default();
@@ -77,6 +80,7 @@ pub fn run() -> Result<()> {
     };
     let state = Rc::new(RefCell::new(State {
         library,
+        library_revision,
         themes,
         theme_index: 0,
         layout,
@@ -118,6 +122,8 @@ pub fn run() -> Result<()> {
     window.set_remix_volume(80.0);
     window.set_shuffle(state.borrow().queue.shuffle);
     window.set_repeat(state.borrow().queue.repeat);
+    window.set_playback_position(0.0);
+    window.set_playback_duration(0.0);
     let initial_theme = state.borrow().themes[0].clone();
     apply_theme(&window, &initial_theme);
 
@@ -239,7 +245,129 @@ pub fn run() -> Result<()> {
 
     let weak = window.as_weak();
     let state_import = state.clone();
-    window.on_import_files(move || { if let Some(window) = weak.upgrade() { let mut state = state_import.borrow_mut(); let mut imported = 0; let mut duplicates = 0; let mut failures = 0; for path in pick_mp3s() { match state.library.import(path) { Ok(ImportResult::Imported) => imported += 1, Ok(ImportResult::Duplicate) => duplicates += 1, Ok(ImportResult::Rejected) | Err(_) => failures += 1 } } if imported > 0 { state.queue = QueueState::new(state.library.tracks.iter().map(|track| track.id.clone()).collect()); if let Err(error) = state.library.save(&state.data_dir.join("library.json")) { window.set_status(format!("Could not save library: {error}").into()); } else { refresh(&window, &state); } } let message = if imported > 0 { format!("Scanned and added {imported} MP3(s); {duplicates} duplicate(s); {failures} failed") } else if duplicates > 0 { format!("No new MP3s; {duplicates} duplicate(s)") } else if failures > 0 { format!("Scan failed for {failures} file(s)") } else { "Scan cancelled".to_string() }; window.set_status(message.into()); } });
+    window.on_import_files(move || {
+        if let Some(window) = weak.upgrade() {
+            let mut state = state_import.borrow_mut();
+            let library_path = state.data_dir.join("library.json");
+            if Library::revision(&library_path).ok() != Some(state.library_revision.clone()) {
+                window.set_status(
+                    "Library changed in another app. Reload before adding music.".into(),
+                );
+                return;
+            }
+            let mut imported = 0;
+            let mut duplicates = 0;
+            let mut failures = 0;
+            for path in pick_mp3s() {
+                match state.library.import(path) {
+                    Ok(ImportResult::Imported) => imported += 1,
+                    Ok(ImportResult::Duplicate) => duplicates += 1,
+                    Ok(ImportResult::Rejected) | Err(_) => failures += 1,
+                }
+            }
+            if imported > 0 {
+                match state
+                    .library
+                    .save_if_unchanged(&library_path, state.library_revision.clone())
+                {
+                    Ok(revision) => {
+                        state.library_revision = Some(revision);
+                        state.queue = QueueState::new(
+                            state
+                                .library
+                                .tracks
+                                .iter()
+                                .map(|track| track.id.clone())
+                                .collect(),
+                        );
+                        refresh(&window, &state);
+                    }
+                    Err(error) => {
+                        if let Ok(library) = Library::load(&library_path) {
+                            state.library = library;
+                        }
+                        state.library_revision = Library::revision(&library_path).ok().flatten();
+                        refresh(&window, &state);
+                        window.set_status(format!("Import was not saved: {error}").into());
+                        return;
+                    }
+                }
+            }
+            window.set_status(
+                format!("Added {imported} MP3(s); {duplicates} duplicate(s); {failures} failed")
+                    .into(),
+            );
+        }
+    });
+
+    let weak = window.as_weak();
+    let state_reload = state.clone();
+    window.on_reload_library(move || {
+        if let Some(window) = weak.upgrade() {
+            let mut state = state_reload.borrow_mut();
+            let path = state.data_dir.join("library.json");
+            match Library::load(&path) {
+                Ok(library) => {
+                    if let Some(audio) = &mut state.audio {
+                        audio.stop();
+                    }
+                    state.library = library;
+                    state.library_revision = Library::revision(&path).ok().flatten();
+                    state.queue = QueueState::new(
+                        state
+                            .library
+                            .tracks
+                            .iter()
+                            .map(|track| track.id.clone())
+                            .collect(),
+                    );
+                    set_media_playback(&mut state, false);
+                    window.set_playing(false);
+                    window.set_now_playing("Nothing queued".into());
+                    window.set_playback_position(0.0);
+                    window.set_playback_duration(0.0);
+                    window.set_playback_time("0:00 / 0:00".into());
+                    refresh(&window, &state);
+                    let missing = state
+                        .library
+                        .tracks
+                        .iter()
+                        .filter(|track| !track.path.is_file())
+                        .count();
+                    window.set_status(
+                        format!(
+                            "Library reloaded: {} tracks, {missing} missing files",
+                            state.library.tracks.len()
+                        )
+                        .into(),
+                    );
+                }
+                Err(error) => {
+                    window.set_status(format!("Could not reload library: {error}").into())
+                }
+            }
+        }
+    });
+
+    let weak = window.as_weak();
+    let state_seek = state.clone();
+    window.on_seek_to(move |seconds| {
+        if let Some(window) = weak.upgrade() {
+            let state = state_seek.borrow();
+            let duration = state
+                .queue
+                .index
+                .and_then(|index| state.library.tracks.get(index))
+                .and_then(|track| track.duration_ms);
+            if let (Some(audio), Some(duration)) = (&state.audio, duration) {
+                let millis = ((seconds.max(0.0) as f64) * 1000.0) as u64;
+                let position = Duration::from_millis(millis.min(duration));
+                if audio.seek(position).is_ok() {
+                    window.set_playback_position(position.as_secs_f32());
+                }
+            }
+        }
+    });
 
     let weak = window.as_weak();
     let state_select = state.clone();
@@ -262,6 +390,22 @@ pub fn run() -> Result<()> {
             let mut state = state_toggle.borrow_mut();
             if state.queue.index.is_none() {
                 window.set_status("Scan for MP3s first".into());
+                return;
+            }
+            if !state
+                .audio
+                .as_ref()
+                .map(AudioPlayer::has_track)
+                .unwrap_or(false)
+            {
+                if let Some(track) = state
+                    .queue
+                    .index
+                    .and_then(|index| state.library.tracks.get(index))
+                    .cloned()
+                {
+                    let _ = play_track(&mut state, &window, &track);
+                }
                 return;
             }
             state.queue.playing = !state.queue.playing;
@@ -656,6 +800,30 @@ pub fn run() -> Result<()> {
                     .map(AudioPlayer::is_finished)
                     .unwrap_or(false)
         };
+        if let Some(window) = weak.upgrade() {
+            let state = state_auto_advance.borrow();
+            if let Some(audio) = &state.audio {
+                if let Some(index) = state.queue.index {
+                    let position = audio.position();
+                    let duration = state
+                        .library
+                        .tracks
+                        .get(index)
+                        .and_then(|track| track.duration_ms)
+                        .unwrap_or(0);
+                    window.set_playback_position(position.as_secs_f32());
+                    window.set_playback_duration(duration as f32 / 1000.0);
+                    window.set_playback_time(
+                        format!(
+                            "{} / {}",
+                            clock_label(position.as_secs()),
+                            clock_label(duration / 1000)
+                        )
+                        .into(),
+                    );
+                }
+            }
+        }
         if finished {
             advance(&weak, &state_auto_advance, true);
         }
@@ -726,6 +894,23 @@ fn apply_playback_state(state: &mut State, window: &AppWindow, playing: bool) {
     if state.queue.index.is_none() {
         return;
     }
+    if playing
+        && !state
+            .audio
+            .as_ref()
+            .map(AudioPlayer::has_track)
+            .unwrap_or(false)
+    {
+        if let Some(track) = state
+            .queue
+            .index
+            .and_then(|index| state.library.tracks.get(index))
+            .cloned()
+        {
+            let _ = play_track(state, window, &track);
+        }
+        return;
+    }
     let Some(audio) = &state.audio else {
         state.queue.playing = false;
         window.set_status("Audio output unavailable".into());
@@ -751,6 +936,8 @@ fn play_track(state: &mut State, window: &AppWindow, track: &Track) -> bool {
     };
     match audio.play(&track.path) {
         Ok(()) => {
+            window.set_playback_position(0.0);
+            window.set_playback_duration(track.duration_ms.unwrap_or(0) as f32 / 1000.0);
             state.queue.playing = true;
             window.set_now_playing(format!("{} — {}", track.artist, track.title).into());
             window.set_playing(true);
@@ -766,6 +953,10 @@ fn play_track(state: &mut State, window: &AppWindow, track: &Track) -> bool {
             false
         }
     }
+}
+
+fn clock_label(seconds: u64) -> String {
+    format!("{}:{:02}", seconds / 60, seconds % 60)
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -809,7 +1000,11 @@ fn refresh(window: &AppWindow, state: &State) {
                 index + 1,
                 track.artist,
                 track.title,
-                track.album
+                if track.path.is_file() {
+                    track.album.clone()
+                } else {
+                    format!("{} · File missing", track.album)
+                }
             )
             .into()
         })

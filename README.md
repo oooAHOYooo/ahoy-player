@@ -34,6 +34,8 @@ opens the terminal player. These shortcuts use the existing `start` command.
 
 The Linux binary is `target/release/ahoy-player`. It has native MP3 selection, SHA-256 duplicate detection, ID3 metadata with filename/folder fallbacks, local JSON persistence, and Rodio playback. Data lives below the platform local-data directory (normally `~/.local/share/ahoy-player`).
 
+The desktop library has a **Reload** button for changes made by the terminal player. Missing music files are labeled in the list. The player refuses to overwrite a library changed by another app while it was open; reload and retry the import. The playback bar shows duration and elapsed time for imported MP3s and supports seeking when duration is available.
+
 The release workflow attaches matching GUI builds to [GitHub Releases](https://github.com/oooAHOYooo/ahoy-player/releases/latest). Linux x86_64 downloads include a user-local installer (`./install.sh`); macOS downloads are app bundles for Apple Silicon and Intel. The ahoy.ooo download page reads the current release assets directly from GitHub, so it follows published versions without a per-release page edit. The in-app update control checks GitHub Releases at startup (cached for 12 hours), then opens the matching release page so users can download and install the update themselves. The GUI currently checks for updates on x86_64 Linux and both supported macOS architectures; Linux needs `curl` for the check.
 
 Themes and layouts persist separately. Starter themes: Neutral, Winamp-inspired, Terminal green, Monochrome, and High contrast. Users can save, switch, import validated JSON, and export themes.
@@ -63,7 +65,7 @@ ahoy player  # terminal player / TUI
 ahoy --help  # terminal CLI/TUI help
 ```
 
-Both products use `~/.local/share/ahoy-player/library.json` (or `$XDG_DATA_HOME/ahoy-player`). The terminal companion automatically migrates its former `~/.ahoy-player/library.json` on first use; the old file is retained. The shared JSON is compatible with the native player, although terminal scans currently use filename/folder metadata rather than reading ID3 tags.
+Both products use `~/.local/share/ahoy-player/library.json` (or `$XDG_DATA_HOME/ahoy-player`) on Linux and `~/Library/Application Support/ahoy-player/library.json` on macOS. The terminal companion automatically migrates its former `~/.ahoy-player/library.json` on first use; the old file is retained. Both importers read common ID3 tags and use matching filename/folder fallbacks. Library saves use temporary files and refuse a stale overwrite when another app has changed the file. Relaunch the terminal player or use **Reload** in the desktop player to see external changes.
 
 For an Arch package, run `packaging/linux/build-arch.sh`; it produces a `target/ahoy-player-*.pkg.tar.*` package. It depends on Node.js for the current terminal implementation, and `mpv` or `ffplay` is needed for terminal playback. For Debian packaging, install `cargo-deb` and run `packaging/linux/build-deb.sh`.
 
@@ -107,12 +109,11 @@ Then, from any terminal directory:
 ahoy player
 ```
 
-`ahoy player` is the interactive terminal player. To update a tarball install,
+`ahoy player` is the interactive terminal player. Run `ahoy doctor` to check the library path and available audio player. To update a tarball install,
 repeat the command above with the newer release's version and asset URL. Node.js
 20+ is required on every platform. Audio playback uses
 the built-in `afplay` on macOS; Linux requires `mpv`, VLC (`cvlc`), or FFmpeg
-(`ffplay`). Windows TUI and library commands work, while Windows audio playback
-is not supported yet.
+(`ffplay`). On Windows, install `mpv` or FFmpeg (`ffplay`) and add its binary directory to `PATH`; Ahoy can then play audio. Live mixer changes through mpv IPC are currently available on macOS and Linux; on Windows, levels apply when playback starts.
 
 ```bash
 npm install

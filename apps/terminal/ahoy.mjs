@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { constants as fsConstants, existsSync, realpathSync } from "node:fs";
-import { access, copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir, platform, tmpdir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +15,11 @@ import { AudioMixer } from "./audio-mixer.mjs";
 
 // This is deliberately the same path and JSON shape used by the native player.
 // AHOY_PLAYER_HOME remains useful for tests and portable installs.
-const appHome = process.env.AHOY_PLAYER_HOME || join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "ahoy-player");
+const appHome = process.env.AHOY_PLAYER_HOME || (platform() === "darwin"
+  ? join(homedir(), "Library", "Application Support", "ahoy-player")
+  : platform() === "win32"
+    ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "ahoy-player")
+    : join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "ahoy-player"));
 const legacyAppHome = process.env.AHOY_PLAYER_LEGACY_HOME || (process.env.AHOY_PLAYER_HOME ? join(appHome, "legacy") : join(homedir(), ".ahoy-player"));
 const modulePath = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(modulePath);
@@ -132,22 +136,88 @@ function quantizeRemixFrequency(frequency, scale) {
 }
 
 export function labelsForPath(filePath) {
-  const stem = basename(filePath, extname(filePath)).replace(/[_]+/g, " ").trim();
-  const numbered = stem.replace(/^\s*\d{1,3}\s*[-_.]\s*/, "");
-  const parts = numbered.split(/\s+-\s+/).map((part) => part.trim()).filter(Boolean);
+  const clean = (value) => value.replace(/_/g, " ").replace(/\s+/g, " ").trim().replace(/^[\s\-–—]+|[\s\-–—]+$/g, "");
+  const stem = clean(basename(filePath, extname(filePath)));
+  const match = stem.match(/^\[?(\d+)\]?[-_.\s]+(.+)$/);
+  const numbered = match ? clean(match[2]) : stem;
+  const parts = numbered.split(" - ").map(clean).filter(Boolean);
+  const albumFolder = clean(basename(dirname(filePath)));
+  const artistFolder = clean(basename(dirname(dirname(filePath))));
+  const meaningful = (value) => value && !/^(music|downloads?|audio|mp3|files)$/i.test(value);
   return {
-    artist: parts.length > 1 ? parts[0] : "Unknown Artist",
-    title: parts.length > 1 ? parts.slice(1).join(" - ") : (numbered || "Untitled"),
-    album: basename(dirname(filePath)) || "Local Imports"
+    artist: parts.length > 1 ? parts[0] : (meaningful(artistFolder) ? artistFolder : "Unknown Artist"),
+    title: parts.length > 1 ? parts[parts.length - 1] : (numbered || "Untitled"),
+    album: parts.length > 2 ? parts.slice(1, -1).join(" — ") : (meaningful(albumFolder) ? albumFolder : "Local Imports"),
+    track_number: match ? Number(match[1]) : null
   };
 }
 
-async function loadLibrary() {
+function readId3Text(frame) {
+  if (!frame?.length) return null;
+  const encoding = frame[0];
+  let value;
+  if (encoding === 0) value = frame.subarray(1).toString("latin1");
+  else if (encoding === 3) value = frame.subarray(1).toString("utf8");
+  else if (encoding === 1 || encoding === 2) {
+    const little = encoding === 1 && frame[1] === 0xff && frame[2] === 0xfe;
+    let bytes = frame.subarray(encoding === 1 && (frame[1] === 0xff || frame[1] === 0xfe) ? 3 : 1);
+    if (!little) {
+      bytes = Buffer.from(bytes);
+      for (let i = 0; i + 1 < bytes.length; i += 2) [bytes[i], bytes[i + 1]] = [bytes[i + 1], bytes[i]];
+    }
+    value = bytes.toString("utf16le");
+  }
+  return value?.replace(/\0.*$/s, "").trim() || null;
+}
+
+export async function metadataForPath(filePath) {
+  const fallback = labelsForPath(filePath);
   try {
-    const parsed = JSON.parse(await readFile(libraryPath, "utf8"));
-    return normalizeLibrary(parsed);
+    const file = await readFile(filePath);
+    if (file.toString("ascii", 0, 3) !== "ID3") {
+      if (file.length < 128 || file.toString("ascii", file.length - 128, file.length - 125) !== "TAG") return fallback;
+      const text = (start, end) => file.toString("latin1", file.length - 128 + start, file.length - 128 + end).replace(/\0.*$/s, "").trim();
+      const comment = file.subarray(file.length - 31, file.length - 1);
+      return { title: text(3, 33) || fallback.title, artist: text(33, 63) || fallback.artist,
+        album: text(63, 93) || fallback.album, track_number: comment[28] === 0 && comment[29] ? comment[29] : fallback.track_number };
+    }
+    const version = file[3];
+    if (version !== 3 && version !== 4) return fallback;
+    const size = (file[6] << 21) | (file[7] << 14) | (file[8] << 7) | file[9];
+    const end = Math.min(file.length, 10 + size);
+    const tags = {};
+    for (let offset = 10; offset + 10 <= end;) {
+      const id = file.toString("ascii", offset, offset + 4);
+      if (!/^[A-Z0-9]{4}$/.test(id)) break;
+      const length = version === 4
+        ? (file[offset + 4] << 21) | (file[offset + 5] << 14) | (file[offset + 6] << 7) | file[offset + 7]
+        : file.readUInt32BE(offset + 4);
+      if (length < 0 || offset + 10 + length > end) break;
+      if (["TIT2", "TPE1", "TALB", "TRCK"].includes(id)) tags[id] = readId3Text(file.subarray(offset + 10, offset + 10 + length));
+      offset += 10 + length;
+    }
+    return {
+      title: tags.TIT2 || fallback.title,
+      artist: tags.TPE1 || fallback.artist,
+      album: tags.TALB || fallback.album,
+      track_number: Number.parseInt(tags.TRCK, 10) || fallback.track_number
+    };
+  } catch { return fallback; }
+}
+
+async function loadLibrary() {
+  return (await loadLibrarySnapshot()).library;
+}
+
+async function loadLibrarySnapshot() {
+  try {
+    const bytes = await readFile(libraryPath);
+    return { library: normalizeLibrary(JSON.parse(bytes.toString("utf8"))), revision: createHash("sha256").update(bytes).digest("hex") };
   } catch (error) {
-    if (error.code === "ENOENT") return migrateLegacyLibrary();
+    if (error.code === "ENOENT") {
+      const library = await migrateLegacyLibrary();
+      return { library, revision: await libraryRevision() };
+    }
     throw new Error(`Could not read ${libraryPath}: ${error.message}`);
   }
 }
@@ -190,9 +260,30 @@ async function migrateLegacyLibrary() {
   }
 }
 
-async function saveLibrary(library) {
+async function libraryRevision() {
+  try { return createHash("sha256").update(await readFile(libraryPath)).digest("hex"); }
+  catch (error) { if (error.code === "ENOENT") return null; throw error; }
+}
+
+async function saveLibrary(library, expectedRevision = null) {
   await mkdir(appHome, { recursive: true });
-  await writeFile(libraryPath, `${JSON.stringify(library, null, 2)}\n`, "utf8");
+  const lockPath = `${libraryPath}.lock`;
+  let lock;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try { lock = await open(lockPath, "wx"); break; }
+    catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  if (!lock) throw new Error("Library is busy; retry after the other app finishes.");
+  const temporary = `${libraryPath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    if (await libraryRevision() !== expectedRevision) throw new Error("Library changed in another app. Reload and rescan before saving.");
+    await writeFile(temporary, `${JSON.stringify(library, null, 2)}\n`, { flag: "wx" });
+    if (await libraryRevision() !== expectedRevision) throw new Error("Library changed in another app. Reload and rescan before saving.");
+    await rename(temporary, libraryPath);
+  } finally { await rm(temporary, { force: true }); await lock.close(); await rm(lockPath, { force: true }); }
 }
 
 async function mp3Files(root) {
@@ -213,7 +304,7 @@ async function mp3Files(root) {
 }
 
 export async function scanDirectories(directories) {
-  const library = await loadLibrary();
+  const { library, revision: expectedRevision } = await loadLibrarySnapshot();
   const known = new Map(library.tracks.map((track) => [track.path, track]));
   let added = 0;
   let updated = 0;
@@ -221,16 +312,15 @@ export async function scanDirectories(directories) {
     const root = resolve(source);
     if (!existsSync(root)) { console.error(`Not found: ${root}`); continue; }
     for (const path of await mp3Files(root)) {
-      const info = await stat(path);
       const existing = known.get(path);
-      const labels = labelsForPath(path);
+      const labels = await metadataForPath(path);
       const fingerprint = createHash("sha256").update(await readFile(path)).digest("hex");
       const track = {
         id: existing?.id || `local:${fingerprint.slice(0, 24)}`,
         path,
         filename: basename(path),
         ...labels,
-        track_number: existing?.track_number ?? null,
+        track_number: labels.track_number,
         fingerprint,
         duration_ms: existing?.duration_ms ?? null,
         imported_at: existing?.imported_at || String(Math.floor(Date.now() / 1000))
@@ -240,7 +330,7 @@ export async function scanDirectories(directories) {
     }
   }
   library.tracks.sort((a, b) => a.artist.localeCompare(b.artist) || a.album.localeCompare(b.album) || a.title.localeCompare(b.title));
-  await saveLibrary(library);
+  await saveLibrary(library, expectedRevision);
   return { added, updated, total: library.tracks.length };
 }
 
@@ -327,16 +417,31 @@ function printTracks(tracks) {
 
 function playerCommand(volume = 1, startOffset = 0, liveMix = false) {
   const vol = Math.max(0, Math.min(2.0, volume));
-  if (liveMix && spawnSync("which", ["mpv"], { stdio: "ignore" }).status === 0) return { command: "mpv", baseArgs: ["--no-video", ...(startOffset > 0 ? [`--start=${startOffset}`] : [])] };
+  const hasCommand = (name) => spawnSync(platform() === "win32" ? "where.exe" : "which", [name], { stdio: "ignore" }).status === 0;
+  if (liveMix && hasCommand("mpv")) return { command: "mpv", baseArgs: ["--no-video", ...(startOffset > 0 ? [`--start=${startOffset}`] : [])] };
   if (platform() === "darwin") return { command: "afplay", baseArgs: ["-v", String(vol)] };
   for (const candidate of [
     ["mpv", ["--no-video", `--volume=${Math.round(vol * 100)}`, ...(startOffset > 0 ? [`--start=${startOffset}`] : [])]],
     ["cvlc", ["--play-and-exit", `--gain=${vol}`, ...(startOffset > 0 ? [`--start-time=${startOffset}`] : [])]],
     ["ffplay", ["-nodisp", "-autoexit", "-volume", String(Math.round(vol * 100)), ...(startOffset > 0 ? ["-ss", String(startOffset)] : [])]]
   ]) {
-    if (spawnSync("which", [candidate[0]], { stdio: "ignore" }).status === 0) return { command: candidate[0], baseArgs: candidate[1] };
+    if (hasCommand(candidate[0])) return { command: candidate[0], baseArgs: candidate[1] };
   }
   return null;
+}
+
+function audioSetupMessage() {
+  if (platform() === "win32") return "Install mpv or FFmpeg, add its bin directory to PATH, and reopen your terminal.";
+  if (platform() === "darwin") return "macOS should provide afplay. Check that /usr/bin/afplay is available.";
+  return "Install mpv, VLC (cvlc), or FFmpeg (ffplay) with your package manager.";
+}
+
+function doctor() {
+  const player = playerCommand();
+  console.log(`Ahoy ${platform()} · Node ${process.version}`);
+  console.log(`Library: ${libraryPath}`);
+  console.log(player ? `Audio: ${player.command} is ready` : `Audio: unavailable. ${audioSetupMessage()}`);
+  console.log("Cover art: install FFmpeg for embedded art and duration details.");
 }
 
 const trackDurationCache = new Map();
@@ -382,7 +487,7 @@ function selectTrack(tracks, selector) {
 export async function playTrack(track, options = 1, startOffset = 0) {
   const { quiet = false, mixer, volume = 1 } = typeof options === "number" ? { volume: options } : options;
   const player = playerCommand(volume, startOffset, Boolean(mixer));
-  if (!player) throw new Error("Install mpv, VLC (cvlc), or FFmpeg (ffplay) to play audio on Linux.");
+  if (!player) throw new Error(`Audio player not found. ${audioSetupMessage()}`);
   await stopPreviousPlayback();
   if (!quiet) console.log(`${accent("▶")} ${track.title} ${dim(`— ${track.artist}`)}`);
   let sourcePath = track.path;
@@ -767,7 +872,7 @@ async function tui() {
         welcomeLine, "Your library stays on this machine.", "",
         emptyStatus, "", "s  Scan music folders",
         "d  Try a demo track", "l  AHOY ID (optional)",
-        playbackReady ? "Audio output ready." : "Audio output needs mpv, VLC, or FFmpeg.",
+        playbackReady ? "Audio output ready." : (platform() === "win32" ? "Install mpv or FFmpeg and add it to PATH for audio." : "Install mpv, VLC, or FFmpeg for audio."),
         "", "x  Quit"
       ].map(line => crop(terminalText(line), width));
       lines[0] = accent(lines[0]);
@@ -1059,7 +1164,7 @@ async function tui() {
 
 function help() {
   console.log("  ahoy rescan [folder...]     refresh the saved library from its folders");
-  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy player                open the terminal player (same as ahoy tui)\n  ahoy scan [folder...]      add MP3s from local folders; interactive folder choice when run in a terminal\n  ahoy backlight             check Linux keyboard backlight support and permissions\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n  ahoy update                install the latest published terminal player\n\nIn the player, press s to scan and r to repeat the library.\nKeyboard backlight control is opt-in: set AHOY_KEYBOARD_BACKLIGHT=1; use K/J to adjust.\nmacOS uses the built-in afplay. Linux uses mpv, VLC (cvlc), or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
+  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy player                open the terminal player (same as ahoy tui)\n  ahoy scan [folder...]      add MP3s from local folders; interactive folder choice when run in a terminal\n  ahoy doctor               check audio setup and library location\n  ahoy backlight             check Linux keyboard backlight support and permissions\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n  ahoy update                install the latest published terminal player\n\nIn the player, press s to scan and r to repeat the library.\nKeyboard backlight control is opt-in: set AHOY_KEYBOARD_BACKLIGHT=1; use K/J to adjust.\nmacOS uses afplay; Linux uses mpv, VLC, or ffplay; Windows uses mpv or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
 }
 
 export async function main(args = process.argv.slice(2)) {
@@ -1067,6 +1172,7 @@ export async function main(args = process.argv.slice(2)) {
   if (["help", "--help", "-h"].includes(command)) return help();
   if (["--version", "-v", "version"].includes(command)) return console.log(await packageVersion());
   if (command === "update") return update();
+  if (command === "doctor") return doctor();
   if (command === "backlight") return keyboardBacklightCommand();
   if (command === "scan") {
     const result = rest.length ? await scanDirectories(rest) : await scanDefaultMusic();

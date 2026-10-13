@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rodio::{buffer::SamplesBuffer, Decoder, OutputStream, OutputStreamHandle, Sink};
-use std::{f32::consts::TAU, fs::File, io::BufReader, path::Path};
+use std::{f32::consts::TAU, fs::File, io::BufReader, path::Path, time::Duration};
 
 pub struct AudioPlayer {
     _stream: OutputStream,
@@ -131,6 +131,22 @@ impl AudioPlayer {
         self.sink.as_ref().map(Sink::empty).unwrap_or(true)
     }
 
+    pub fn has_track(&self) -> bool {
+        self.sink.is_some()
+    }
+
+    pub fn position(&self) -> Duration {
+        self.sink.as_ref().map(Sink::get_pos).unwrap_or_default()
+    }
+
+    pub fn seek(&self, position: Duration) -> Result<()> {
+        if let Some(sink) = &self.sink {
+            sink.try_seek(position)
+                .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        }
+        Ok(())
+    }
+
     pub fn stop(&mut self) {
         if let Some(sink) = self.sink.take() {
             sink.stop();
@@ -159,11 +175,19 @@ pub struct QueueState {
 impl QueueState {
     pub fn new(queue: Vec<String>) -> Self {
         let index = (!queue.is_empty()).then_some(0);
-        Self { queue, index, playing: false, shuffle: false, repeat: false }
+        Self {
+            queue,
+            index,
+            playing: false,
+            shuffle: false,
+            repeat: false,
+        }
     }
 
     pub fn next(&mut self) -> bool {
-        let Some(index) = self.index else { return false };
+        let Some(index) = self.index else {
+            return false;
+        };
         if self.queue.len() < 2 {
             if self.repeat && !self.queue.is_empty() {
                 self.index = Some(0);

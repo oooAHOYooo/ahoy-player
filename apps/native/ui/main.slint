@@ -46,6 +46,9 @@ export component AppWindow inherits Window {
     in-out property <bool> lo-fi: false;
     in-out property <bool> shuffle: false;
     in-out property <bool> repeat: false;
+    in-out property <float> playback-position: 0;
+    in-out property <float> playback-duration: 0;
+    in-out property <string> playback-time: "0:00 / 0:00";
     in-out property <float> volume: 100;
     in-out property <float> song-volume: 100;
     in-out property <float> remix-volume: 80;
@@ -59,6 +62,7 @@ export component AppWindow inherits Window {
     callback logout-ahoy();
     callback dismiss-welcome();
     callback import-files();
+    callback reload-library();
     callback select-track(int);
     callback toggle-play();
     callback next-track();
@@ -84,6 +88,7 @@ export component AppWindow inherits Window {
     callback minimize-window();
     callback update-action();
     callback request-playback(bool);
+    callback seek-to(float);
 
     background: root.background-color;
 
@@ -179,6 +184,7 @@ export component AppWindow inherits Window {
                             Text { text: "A private home for the music you already own."; color: #8a9c98; font-size: 11px; }
                         }
                         Text { text: ""; horizontal-stretch: 1; }
+                        ActionButton { label: "Reload"; clicked => { root.reload-library(); } }
                         ActionButton { label: "＋  Add music"; accent: true; clicked => { root.import-files(); } }
                     }
 
@@ -252,7 +258,7 @@ export component AppWindow inherits Window {
                     }
 
                     Rectangle {
-                        height: 96px;
+                        height: 112px;
                         background: #10191a;
                         border-color: root.border-color;
                         border-width: 1px;
@@ -342,7 +348,8 @@ export component AppWindow inherits Window {
                         spacing: 4px;
                         Text { text: "NOW PLAYING"; color: root.accent-color; font-size: 8px; font-weight: 700; }
                         Text { text: root.now-playing; color: root.text-color; font-size: 12px; font-weight: 600; overflow: elide; }
-                        Text { text: root.playing ? "Playing from your library" : "Choose a track to start listening"; color: #82928f; font-size: 9px; }
+                        Text { text: root.playback-duration > 0 ? root.playback-time : (root.playing ? "Playing from your library" : "Choose a track to start listening"); color: #82928f; font-size: 9px; }
+                        Slider { minimum: 0; maximum: root.playback-duration > 0 ? root.playback-duration : 1; value: root.playback-position; enabled: root.playback-duration > 0; changed(value) => { root.seek-to(value); } }
                     }
                     Text { text: ""; horizontal-stretch: 1; }
                     ActionButton { label: root.shuffle ? "Shuffle on" : "Shuffle"; clicked => { root.toggle-shuffle(); } }

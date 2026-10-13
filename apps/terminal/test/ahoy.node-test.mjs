@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
-import { buildSfxCueWav, buildSynthWav, buildToneWav, labelsForPath, main, pianoKeyMap, remixFrequencies, remixKeys } from "../ahoy.mjs";
+import { buildSfxCueWav, buildSynthWav, buildToneWav, labelsForPath, metadataForPath, main, pianoKeyMap, remixFrequencies, remixKeys } from "../ahoy.mjs";
 
 const execFileAsync = promisify(execFile);
 const testDirectory = fileURLToPath(new URL(".", import.meta.url));
@@ -32,14 +32,31 @@ test("reports the package version through the public CLI command", async () => {
 
 test("derives readable labels from conventional MP3 filenames", () => {
   assert.deepEqual(labelsForPath("/Music/Apollo/01 - Brian Eno - An Ending (Ascent).mp3"), {
-    artist: "Brian Eno", title: "An Ending (Ascent)", album: "Apollo"
+    artist: "Brian Eno", title: "An Ending (Ascent)", album: "Apollo", track_number: 1
   });
 });
 
 test("uses a useful fallback for unstructured filenames", () => {
   assert.deepEqual(labelsForPath("/Music/Mixes/morning_walk.mp3"), {
-    artist: "Unknown Artist", title: "morning walk", album: "Mixes"
+    artist: "Unknown Artist", title: "morning walk", album: "Mixes", track_number: null
   });
+});
+
+test("reads ID3 tags before filename labels", async () => {
+  const folder = await mkdtemp(join(tmpdir(), "ahoy-tags-"));
+  const file = join(folder, "wrong filename.mp3");
+  const frame = (id, value) => {
+    const data = Buffer.concat([Buffer.from([3]), Buffer.from(value)]);
+    const header = Buffer.alloc(10);
+    header.write(id, 0, "ascii"); header.writeUInt32BE(data.length, 4);
+    return Buffer.concat([header, data]);
+  };
+  const frames = Buffer.concat([frame("TIT2", "Tagged Title"), frame("TPE1", "Tagged Artist"), frame("TALB", "Tagged Album"), frame("TRCK", "7")]);
+  const header = Buffer.from([73, 68, 51, 3, 0, 0, (frames.length >> 21) & 127, (frames.length >> 14) & 127, (frames.length >> 7) & 127, frames.length & 127]);
+  try {
+    await writeFile(file, Buffer.concat([header, frames]));
+    assert.deepEqual(await metadataForPath(file), { title: "Tagged Title", artist: "Tagged Artist", album: "Tagged Album", track_number: 7 });
+  } finally { await rm(folder, { recursive: true, force: true }); }
 });
 
 test("creates a valid mono WAV file for remix notes", () => {
