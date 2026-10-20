@@ -1088,7 +1088,26 @@ fn visible_indices(state: &State) -> Vec<usize> {
 }
 
 fn track_label(track: &Track) -> SharedString {
-    format!("{} — {}  [{}{}]", track.artist, track.title, track.album, if track.path.is_file() { "" } else { " · File missing" }).into()
+    let duration = track
+        .duration_ms
+        .map(|ms| {
+            let secs = ms / 1000;
+            format!("  ·  {}:{:02}", secs / 60, secs % 60)
+        })
+        .unwrap_or_default();
+    format!(
+        "{} — {}  [{}{}]{}",
+        track.artist,
+        track.title,
+        track.album,
+        duration,
+        if track.path.is_file() {
+            ""
+        } else {
+            " · File missing"
+        }
+    )
+    .into()
 }
 
 fn refresh(window: &AppWindow, state: &State) {

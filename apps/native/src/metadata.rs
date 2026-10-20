@@ -14,7 +14,10 @@ pub struct Metadata {
 
 /// Parses the same human-friendly filename forms supported by the former core.
 pub fn fallback_metadata(filename: &str, relative_path: Option<&Path>) -> Metadata {
-    let stem = filename.strip_suffix(".mp3").or_else(|| filename.strip_suffix(".MP3")).unwrap_or(filename);
+    let stem = Path::new(filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(filename);
     let mut stem = clean(stem);
     let mut track_number = None;
     if let Some((number, rest)) = split_number_prefix(&stem) {

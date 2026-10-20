@@ -134,6 +134,10 @@ export component AppWindow inherits Window {
             if (root.remix-enabled && (event.text == "i" || event.text == "I")) { root.play-remix-note(7, event.text == "I"); return accept; }
             if (!root.remix-enabled && event.text == "s") { root.toggle-shuffle(); return accept; }
             if (!root.remix-enabled && event.text == "r") { root.toggle-repeat(); return accept; }
+            if (event.text == Key.Escape) {
+                if (root.search-query != "") { root.search-query = ""; root.search-changed(""); return accept; }
+                if (root.show-welcome-modal) { root.dismiss-welcome(); return accept; }
+            }
             return reject;
         }
 
@@ -220,6 +224,7 @@ export component AppWindow inherits Window {
                         ActionButton { label: "Albums"; accent: root.library-view == 2; clicked => { root.select-library-view(2); } }
                         Text { text: ""; horizontal-stretch: 1; }
                         LineEdit { width: 230px; placeholder-text: "Search tracks, artists, albums"; text: root.search-query; edited(value) => { root.search-changed(value); } }
+                        if root.search-query != "": ActionButton { label: "✕"; clicked => { root.search-query = ""; root.search-changed(""); } }
                     }
 
                     if root.alert != "": Rectangle {
@@ -303,7 +308,13 @@ export component AppWindow inherits Window {
                                     }
                                 }
                             }
-                            if root.track-items.length == 0: Text { text: "No matches. Try another search."; color: #9aaba6; font-size: 11px; horizontal-alignment: center; }
+                            if root.track-items.length == 0: VerticalBox {
+                                alignment: center;
+                                padding: 20px;
+                                spacing: 8px;
+                                Text { text: root.search-query != "" ? "No matches for \"" + root.search-query + "\"" : "No tracks found."; color: #9aaba6; font-size: 12px; horizontal-alignment: center; }
+                                if root.search-query != "": ActionButton { label: "Clear search"; clicked => { root.search-query = ""; root.search-changed(""); } }
+                            }
                         }
                     }
 
@@ -419,7 +430,13 @@ export component AppWindow inherits Window {
                     VerticalBox {
                         width: 150px;
                         spacing: 2px;
-                        Text { text: "VOLUME"; color: #718681; font-size: 8px; }
+                        HorizontalBox {
+                            padding: 0px;
+                            spacing: 0px;
+                            Text { text: root.volume == 0 ? "MUTED" : "VOLUME"; color: root.volume == 0 ? #e07070 : #718681; font-size: 8px; font-weight: 700; vertical-alignment: center; }
+                            Text { text: ""; horizontal-stretch: 1; }
+                            Text { text: round(root.volume) + "%"; color: #82928f; font-size: 8px; vertical-alignment: center; }
+                        }
                         Slider { minimum: 0; maximum: 100; value: root.volume; changed(value) => { root.set-volume(value); } }
                     }
                     Text { text: root.theme-name; color: root.accent-color; font-size: 9px; vertical-alignment: center; }

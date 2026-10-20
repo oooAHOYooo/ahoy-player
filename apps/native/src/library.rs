@@ -107,12 +107,7 @@ impl Library {
         Ok(format!("{:x}", Sha256::digest(bytes)))
     }
     pub fn import(&mut self, path: PathBuf) -> Result<ImportResult> {
-        if path
-            .extension()
-            .and_then(|x| x.to_str())
-            .map(|x| x.eq_ignore_ascii_case("mp3"))
-            != Some(true)
-        {
+        if !is_supported_audio(&path) {
             return Ok(ImportResult::Rejected);
         }
         let fingerprint = sha256_file(&path)?;
@@ -128,12 +123,7 @@ impl Library {
             .and_then(|x| x.to_str())
             .unwrap_or("Untitled.mp3")
             .to_string();
-        let meta =
-            read_metadata(&path).unwrap_or_else(|| fallback_metadata(&filename, Some(&path)));
-        let duration_ms = lofty::read_from_path(&path)
-            .ok()
-            .map(|tagged| tagged.properties().duration().as_millis() as u64)
-            .filter(|duration| *duration > 0);
+        let (meta, duration_ms) = read_metadata_and_duration(&path);
         let track = Track {
             id: format!("local:{}", &fingerprint[..24]),
             path,
@@ -156,9 +146,30 @@ pub enum ImportResult {
     Duplicate,
     Rejected,
 }
+
+pub fn is_supported_audio(path: &Path) -> bool {
+    let Some(ext) = path.extension().and_then(|x| x.to_str()) else {
+        return false;
+    };
+    matches!(
+        ext.to_ascii_lowercase().as_str(),
+        "mp3" | "flac" | "wav" | "ogg" | "m4a" | "aac" | "opus"
+    )
+}
+
 pub fn sha256_file(path: &Path) -> Result<String> {
-    let bytes = fs::read(path)?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    use std::io::Read;
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    loop {
+        let n = file.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buffer[..n]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
 }
 fn chrono_free_now() -> String {
     format!(
@@ -169,27 +180,46 @@ fn chrono_free_now() -> String {
             .as_secs()
     )
 }
-fn read_metadata(path: &Path) -> Option<Metadata> {
+fn read_metadata_and_duration(path: &Path) -> (Metadata, Option<u64>) {
     use lofty::{
         prelude::{Accessor, TaggedFileExt},
         read_from_path,
     };
-    let tagged = read_from_path(path).ok()?;
-    let tag = tagged.primary_tag().or_else(|| tagged.first_tag())?;
+    let filename = path
+        .file_name()
+        .and_then(|x| x.to_str())
+        .unwrap_or("Untitled");
+    let fallback = fallback_metadata(filename, Some(path));
+    let Ok(tagged) = read_from_path(path) else {
+        return (fallback, None);
+    };
+    let duration_ms = {
+        let ms = tagged.properties().duration().as_millis() as u64;
+        if ms > 0 {
+            Some(ms)
+        } else {
+            None
+        }
+    };
+    let Some(tag) = tagged.primary_tag().or_else(|| tagged.first_tag()) else {
+        return (fallback, duration_ms);
+    };
     let title = tag.title().map(|x| x.to_string());
     let artist = tag.artist().map(|x| x.to_string());
     let album = tag.album().map(|x| x.to_string());
     if title.is_none() && artist.is_none() && album.is_none() {
-        return None;
+        return (fallback, duration_ms);
     }
-    let fallback = fallback_metadata(path.file_name()?.to_str()?, Some(path));
-    Some(Metadata {
-        title: title.unwrap_or(fallback.title),
-        artist: artist.unwrap_or(fallback.artist),
-        album: album.unwrap_or(fallback.album),
-        track_number: tag.track(),
-        used_path_fallback: false,
-    })
+    (
+        Metadata {
+            title: title.unwrap_or(fallback.title),
+            artist: artist.unwrap_or(fallback.artist),
+            album: album.unwrap_or(fallback.album),
+            track_number: tag.track(),
+            used_path_fallback: false,
+        },
+        duration_ms,
+    )
 }
 #[cfg(test)]
 mod tests {
@@ -215,6 +245,16 @@ mod tests {
         library.save(&p).unwrap();
         assert_eq!(Library::load(&p).unwrap(), library);
         let _ = fs::remove_file(p);
+    }
+    #[test]
+    fn supported_audio_formats() {
+        for ext in &["mp3", "flac", "wav", "ogg", "m4a", "aac", "opus", "MP3", "FLAC"] {
+            let path = PathBuf::from(format!("track.{}", ext));
+            assert!(is_supported_audio(&path), "Expected {} to be supported", ext);
+        }
+        assert!(!is_supported_audio(&PathBuf::from("video.mp4")));
+        assert!(!is_supported_audio(&PathBuf::from("document.pdf")));
+        assert!(!is_supported_audio(&PathBuf::from("noextension")));
     }
 }
 #[cfg(test)]

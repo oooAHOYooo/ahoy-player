@@ -286,7 +286,9 @@ async function saveLibrary(library, expectedRevision = null) {
   } finally { await rm(temporary, { force: true }); await lock.close(); await rm(lockPath, { force: true }); }
 }
 
-async function mp3Files(root) {
+const audioExtensions = new Set([".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".opus"]);
+
+async function audioFiles(root) {
   const files = [];
   async function visit(current) {
     let entries;
@@ -296,12 +298,14 @@ async function mp3Files(root) {
       if (entry.name.startsWith(".")) continue;
       const path = join(current, entry.name);
       if (entry.isDirectory()) await visit(path);
-      else if (entry.isFile() && extname(entry.name).toLowerCase() === ".mp3") files.push(path);
+      else if (entry.isFile() && audioExtensions.has(extname(entry.name).toLowerCase())) files.push(path);
     }
   }
   await visit(root);
   return files;
 }
+
+const mp3Files = audioFiles;
 
 export async function scanDirectories(directories) {
   const { library, revision: expectedRevision } = await loadLibrarySnapshot();
