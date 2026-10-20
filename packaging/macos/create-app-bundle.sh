@@ -13,11 +13,15 @@ bundle="$output_dir/Ahoy Player.app"
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 
 rm -rf "$bundle"
-mkdir -p "$bundle/Contents/Resources"
-install -Dm755 "$binary" "$bundle/Contents/MacOS/ahoy-player"
-install -Dm644 "$root/packaging/macos/Info.plist" "$bundle/Contents/Info.plist"
-iconset=$(mktemp -d)
-trap 'rm -rf "$iconset"' EXIT
+mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
+cp "$binary" "$bundle/Contents/MacOS/ahoy-player"
+chmod 755 "$bundle/Contents/MacOS/ahoy-player"
+cp "$root/packaging/macos/Info.plist" "$bundle/Contents/Info.plist"
+chmod 644 "$bundle/Contents/Info.plist"
+tempdir=$(mktemp -d)
+iconset="$tempdir/AhoyPlayer.iconset"
+mkdir -p "$iconset"
+trap 'rm -rf "$tempdir"' EXIT
 for size in 16 32 128 256 512; do
   sips -z "$size" "$size" "$root/apps/desktop/ahoy-logo.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
   double=$((size * 2))

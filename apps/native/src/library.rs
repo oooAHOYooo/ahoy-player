@@ -38,6 +38,13 @@ impl Drop for LibraryLock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Playlist {
+    pub id: String,
+    pub name: String,
+    pub track_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Track {
     pub id: String,
     pub path: PathBuf,
@@ -49,11 +56,15 @@ pub struct Track {
     pub fingerprint: String,
     pub duration_ms: Option<u64>,
     pub imported_at: String,
+    #[serde(default)]
+    pub replay_gain_db: Option<f32>,
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Library {
     pub schema_version: u32,
     pub tracks: Vec<Track>,
+    #[serde(default)]
+    pub playlists: Vec<Playlist>,
 }
 impl Library {
     pub fn revision(path: &Path) -> Result<Option<String>> {
@@ -70,6 +81,7 @@ impl Library {
             Self {
                 schema_version: 1,
                 tracks: vec![],
+                playlists: vec![],
             }
         })
     }
@@ -123,7 +135,7 @@ impl Library {
             .and_then(|x| x.to_str())
             .unwrap_or("Untitled.mp3")
             .to_string();
-        let (meta, duration_ms) = read_metadata_and_duration(&path);
+        let (meta, duration_ms, replay_gain_db) = read_metadata_and_duration(&path);
         let track = Track {
             id: format!("local:{}", &fingerprint[..24]),
             path,
@@ -135,9 +147,43 @@ impl Library {
             fingerprint,
             duration_ms,
             imported_at: format!("{}", chrono_free_now()),
+            replay_gain_db,
         };
         self.tracks.push(track);
         Ok(ImportResult::Imported)
+    }
+
+    pub fn create_playlist(&mut self, name: &str, track_ids: Vec<String>) -> Playlist {
+        let id = format!("playlist:{}", uuid::Uuid::new_v4());
+        let playlist = Playlist {
+            id,
+            name: name.trim().to_string(),
+            track_ids,
+        };
+        self.playlists.push(playlist.clone());
+        playlist
+    }
+
+    pub fn delete_playlist(&mut self, playlist_id: &str) -> bool {
+        let len_before = self.playlists.len();
+        self.playlists.retain(|p| p.id != playlist_id);
+        self.playlists.len() < len_before
+    }
+
+    pub fn export_m3u8(&self, playlist_id: &str, target_path: &Path) -> Result<()> {
+        let Some(pl) = self.playlists.iter().find(|p| p.id == playlist_id) else {
+            bail!("Playlist not found");
+        };
+        let mut content = String::from("#EXTM3U\n");
+        for track_id in &pl.track_ids {
+            if let Some(track) = self.tracks.iter().find(|t| &t.id == track_id) {
+                let secs = track.duration_ms.map(|d| (d / 1000) as i64).unwrap_or(-1);
+                content.push_str(&format!("#EXTINF:{},{} - {}\n", secs, track.artist, track.title));
+                content.push_str(&format!("{}\n", track.path.to_string_lossy()));
+            }
+        }
+        fs::write(target_path, content)?;
+        Ok(())
     }
 }
 #[derive(Debug, PartialEq, Eq)]
@@ -180,7 +226,7 @@ fn chrono_free_now() -> String {
             .as_secs()
     )
 }
-fn read_metadata_and_duration(path: &Path) -> (Metadata, Option<u64>) {
+fn read_metadata_and_duration(path: &Path) -> (Metadata, Option<u64>, Option<f32>) {
     use lofty::{
         prelude::{Accessor, TaggedFileExt},
         read_from_path,
@@ -191,7 +237,7 @@ fn read_metadata_and_duration(path: &Path) -> (Metadata, Option<u64>) {
         .unwrap_or("Untitled");
     let fallback = fallback_metadata(filename, Some(path));
     let Ok(tagged) = read_from_path(path) else {
-        return (fallback, None);
+        return (fallback, None, None);
     };
     let duration_ms = {
         let ms = tagged.properties().duration().as_millis() as u64;
@@ -202,13 +248,33 @@ fn read_metadata_and_duration(path: &Path) -> (Metadata, Option<u64>) {
         }
     };
     let Some(tag) = tagged.primary_tag().or_else(|| tagged.first_tag()) else {
-        return (fallback, duration_ms);
+        return (fallback, duration_ms, None);
     };
+    let replay_gain_db = tag.items().find_map(|item| {
+        let key_str = match item.key() {
+            lofty::tag::ItemKey::ReplayGainTrackGain => "replaygain_track_gain",
+            lofty::tag::ItemKey::Unknown(s) => s.as_str(),
+            _ => "",
+        };
+        if key_str.eq_ignore_ascii_case("replaygain_track_gain")
+            || key_str.eq_ignore_ascii_case("r128_track_gain")
+        {
+            item.value().text().and_then(|t| {
+                let s = t
+                    .trim()
+                    .trim_end_matches(|c: char| c == 'd' || c == 'B' || c == 'b' || c == ' ')
+                    .trim();
+                s.parse::<f32>().ok()
+            })
+        } else {
+            None
+        }
+    });
     let title = tag.title().map(|x| x.to_string());
     let artist = tag.artist().map(|x| x.to_string());
     let album = tag.album().map(|x| x.to_string());
     if title.is_none() && artist.is_none() && album.is_none() {
-        return (fallback, duration_ms);
+        return (fallback, duration_ms, replay_gain_db);
     }
     (
         Metadata {
@@ -219,6 +285,7 @@ fn read_metadata_and_duration(path: &Path) -> (Metadata, Option<u64>) {
             used_path_fallback: false,
         },
         duration_ms,
+        replay_gain_db,
     )
 }
 #[cfg(test)]
@@ -241,6 +308,7 @@ mod tests {
         let library = Library {
             schema_version: 1,
             tracks: vec![],
+            playlists: vec![],
         };
         library.save(&p).unwrap();
         assert_eq!(Library::load(&p).unwrap(), library);
@@ -256,6 +324,35 @@ mod tests {
         assert!(!is_supported_audio(&PathBuf::from("document.pdf")));
         assert!(!is_supported_audio(&PathBuf::from("noextension")));
     }
+    #[test]
+    fn playlist_creation_and_m3u8_export() {
+        let mut library = Library::default();
+        let track = Track {
+            id: "local:123".into(),
+            path: PathBuf::from("/music/song.mp3"),
+            filename: "song.mp3".into(),
+            title: "Song".into(),
+            artist: "Artist".into(),
+            album: "Album".into(),
+            track_number: Some(1),
+            fingerprint: "123".into(),
+            duration_ms: Some(180_000),
+            imported_at: "0".into(),
+            replay_gain_db: Some(-3.0),
+        };
+        library.tracks.push(track);
+        let pl = library.create_playlist("Favorites", vec!["local:123".into()]);
+        assert_eq!(pl.name, "Favorites");
+        assert_eq!(library.playlists.len(), 1);
+
+        let out = std::env::temp_dir().join(format!("test-{}.m3u8", uuid::Uuid::new_v4()));
+        library.export_m3u8(&pl.id, &out).unwrap();
+        let content = fs::read_to_string(&out).unwrap();
+        assert!(content.contains("#EXTM3U"));
+        assert!(content.contains("#EXTINF:180,Artist - Song"));
+        assert!(content.contains("/music/song.mp3"));
+        let _ = fs::remove_file(out);
+    }
 }
 #[cfg(test)]
 mod revision_tests {
@@ -266,6 +363,7 @@ mod revision_tests {
         let library = Library {
             schema_version: 1,
             tracks: vec![],
+            playlists: vec![],
         };
         let revision = library.save_if_unchanged(&path, None).unwrap();
         fs::write(&path, b"external edit").unwrap();

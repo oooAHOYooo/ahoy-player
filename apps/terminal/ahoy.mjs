@@ -860,11 +860,12 @@ async function tui() {
     const position = currentTrack ? Math.min(elapsed(), Number.isFinite(duration) ? duration : Infinity) : 0;
     const barWidth = Math.max(8, Math.min(50, width - 4));
     const filled = Number.isFinite(duration) ? Math.min(barWidth, Math.floor(position / duration * barWidth)) : 0;
+    const visualizer = active && motion ? `   ${renderSpectrumVisualizer(active, tick, Math.min(12, Math.floor(barWidth / 3)))}` : "";
     const buttons = ["[ Previous", active ? "Space Pause" : "Space Play", "] Next", "v Waveform"];
     const buttonLabels = buttons.map((label, index) => focus === index ? `>${label}<` : label);
     const controlLines = width < 64 ? buttonLabels.map(textLine) : [textLine(buttonLabels.join("  "))];
     lines.push("", accent(textLine((tags.title || track.title).toUpperCase())), dim(textLine(`${tags.artist || track.artist} · ${tags.album || track.album}`)),
-      textLine(`${clockLabel(position)} / ${clockLabel(duration)}  ${active ? "PLAYING" : paused ? "PAUSED" : "READY"}`),
+      textLine(`${clockLabel(position)} / ${clockLabel(duration)}  ${active ? "PLAYING" : paused ? "PAUSED" : "READY"}${visualizer}`),
       textLine(`[${"=".repeat(filled)}${"-".repeat(barWidth - filled)}]`),
       ...controlLines,
       dim(textLine(remixMode ? "[ ] scale · ; sound · 0/9 mute · 1–4 layer level · 5–7 FX" : "Tab focus · Enter activate · b Braille/ASCII")),
@@ -1236,9 +1237,65 @@ async function tui() {
   });
 }
 
+function renderSpectrumVisualizer(active, tick, width = 12) {
+  if (!active) return "";
+  const bars = [" ", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+  let out = "";
+  for (let i = 0; i < width; i++) {
+    const wave = Math.sin((tick * 0.4) + (i * 0.6)) * 0.5 + Math.cos((tick * 0.2) + (i * 0.9)) * 0.3 + 0.5;
+    const level = Math.max(0, Math.min(7, Math.floor(wave * 8)));
+    out += bars[level];
+  }
+  return out;
+}
+
+async function runDaemon(args) {
+  const [subcommand = "status", ...rest] = args;
+  const daemonPidFile = join(appHome, "daemon.pid");
+  if (subcommand === "stop") {
+    if (existsSync(daemonPidFile)) {
+      const pid = parseInt(await readFile(daemonPidFile, "utf8"), 10);
+      try { process.kill(pid, "SIGTERM"); console.log(`${accent("Stopped")} Ahoy daemon (PID ${pid})`); }
+      catch (e) { console.log(`Daemon PID ${pid} was not running.`); }
+      await rm(daemonPidFile, { force: true });
+    } else {
+      console.log("No daemon PID found.");
+    }
+    return;
+  }
+  if (subcommand === "status") {
+    if (existsSync(daemonPidFile)) {
+      const pid = parseInt(await readFile(daemonPidFile, "utf8"), 10);
+      try {
+        process.kill(pid, 0);
+        console.log(`${accent("Running")} · Ahoy daemon PID ${pid}`);
+        return;
+      } catch (e) {
+        await rm(daemonPidFile, { force: true });
+      }
+    }
+    console.log("Ahoy daemon is stopped.");
+    return;
+  }
+  if (subcommand === "play" || subcommand === "start") {
+    const library = await loadLibrary();
+    const track = rest.length ? selectTrack(library.tracks, rest.join(" ")) : library.tracks[0];
+    if (!track) throw new Error("No track to play.");
+    const child = spawn(process.execPath, [modulePath, "play", track.id], {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+    await writeFile(daemonPidFile, String(child.pid));
+    console.log(`${accent("Started daemon")} (PID ${child.pid}) playing: ${track.title} — ${track.artist}`);
+    return;
+  }
+  console.log("Usage: ahoy daemon [start|play <track>|stop|status]");
+}
+
 function help() {
   console.log("  ahoy rescan [folder...]     refresh the saved library from its folders");
-  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy player                open the terminal player (same as ahoy tui)\n  ahoy scan [folder...]      add MP3s from local folders; interactive folder choice when run in a terminal\n  ahoy doctor               check audio setup and library location\n  ahoy backlight             check Linux keyboard backlight support and permissions\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n  ahoy update                install the latest published terminal player\n\nIn the player, press s to scan and r to repeat the library.\nKeyboard backlight control is opt-in: set AHOY_KEYBOARD_BACKLIGHT=1; use K/J to adjust.\nmacOS uses afplay; Linux uses mpv, VLC, or ffplay; Windows uses mpv or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
+  console.log(`\n${accent("AHOY PLAYER / TERMINAL")}\n\n  ahoy player                open the terminal player (same as ahoy tui)\n  ahoy scan [folder...]      add MP3s from local folders; interactive folder choice when run in a terminal\n  ahoy daemon [start|stop]   run playback in background daemon\n  ahoy doctor               check audio setup and library location\n  ahoy backlight             check Linux keyboard backlight support and permissions\n  ahoy demo [--music]        install and index a bundled demo MP3\n  ahoy library               list your local library\n  ahoy search <words>        find tracks\n  ahoy play <number|words>   play one track\n  ahoy tui                   browse with a small terminal deck\n  ahoy update                install the latest published terminal player\n\nIn the player, press s to scan and r to repeat the library.\nKeyboard backlight control is opt-in: set AHOY_KEYBOARD_BACKLIGHT=1; use K/J to adjust.\nmacOS uses afplay; Linux uses mpv, VLC, or ffplay; Windows uses mpv or ffplay.\nLibrary metadata stays local: ${libraryPath}\n`);
 }
 
 export async function main(args = process.argv.slice(2)) {
@@ -1247,6 +1304,7 @@ export async function main(args = process.argv.slice(2)) {
   if (["--version", "-v", "version"].includes(command)) return console.log(await packageVersion());
   if (command === "update") return update();
   if (command === "doctor") return doctor();
+  if (command === "daemon") return runDaemon(rest);
   if (command === "backlight") return keyboardBacklightCommand();
   if (command === "scan") {
     const result = rest.length ? await scanDirectories(rest) : await scanDefaultMusic();

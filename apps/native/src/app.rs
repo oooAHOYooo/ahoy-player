@@ -386,10 +386,16 @@ pub fn run() -> Result<()> {
             let mut state = state_select.borrow_mut();
             if let Some(actual_index) = visible_indices(&state).get(index as usize).copied() {
                 let track = state.library.tracks[actual_index].clone();
-                state.queue.index = Some(actual_index);
+                if let Some(pos) = state.queue.queue.iter().position(|id| id == &track.id) {
+                    state.queue.index = Some(pos);
+                } else {
+                    state.queue.queue.push(track.id.clone());
+                    state.queue.index = Some(state.queue.queue.len() - 1);
+                }
                 if play_track(&mut state, &window, &track) {
                     window.set_status("Playing".into());
                 }
+                refresh(&window, &state);
             }
         }
     });
@@ -399,9 +405,11 @@ pub fn run() -> Result<()> {
     window.on_select_queue_track(move |index| {
         if let Some(window) = weak.upgrade() {
             let mut state = state_queue_select.borrow_mut();
-            if let Some(track) = state.library.tracks.get(index as usize).cloned() {
-                state.queue.index = Some(index as usize);
-                let _ = play_track(&mut state, &window, &track);
+            if let Some(track_id) = state.queue.queue.get(index as usize).cloned() {
+                if let Some(track) = state.library.tracks.iter().find(|t| t.id == track_id).cloned() {
+                    state.queue.index = Some(index as usize);
+                    let _ = play_track(&mut state, &window, &track);
+                }
             }
         }
     });
@@ -507,6 +515,96 @@ pub fn run() -> Result<()> {
         if let Some(window) = weak.upgrade() {
             window.set_repeat(value);
             window.set_status(if value { "Repeat on" } else { "Repeat off" }.into());
+        }
+    });
+
+    let weak_eq = window.as_weak();
+    let state_eq = state.clone();
+    window.on_cycle_eq(move || {
+        if let Some(window) = weak_eq.upgrade() {
+            let mut state = state_eq.borrow_mut();
+            if let Some(audio) = &mut state.audio {
+                let name = audio.cycle_eq_preset();
+                window.set_eq_name(name.into());
+                window.set_status(format!("Equalizer: {name}").into());
+            }
+        }
+    });
+
+    let weak_clear = window.as_weak();
+    let state_clear = state.clone();
+    window.on_clear_queue(move || {
+        if let Some(window) = weak_clear.upgrade() {
+            let mut state = state_clear.borrow_mut();
+            state.queue.clear();
+            if let Some(audio) = &mut state.audio {
+                audio.stop();
+            }
+            window.set_playing(false);
+            window.set_current_track_id("".into());
+            window.set_now_title("Queue cleared".into());
+            window.set_now_artist("".into());
+            window.set_now_album("".into());
+            window.set_has_artwork(false);
+            refresh(&window, &state);
+        }
+    });
+
+    let weak_rm = window.as_weak();
+    let state_rm = state.clone();
+    window.on_remove_queue_track(move |index| {
+        if let Some(window) = weak_rm.upgrade() {
+            let mut state = state_rm.borrow_mut();
+            state.queue.remove_track(index as usize);
+            refresh(&window, &state);
+        }
+    });
+
+    let weak_mv = window.as_weak();
+    let state_mv = state.clone();
+    window.on_move_queue_track(move |from, to| {
+        if let Some(window) = weak_mv.upgrade() {
+            let mut state = state_mv.borrow_mut();
+            state.queue.move_track(from as usize, to as usize);
+            refresh(&window, &state);
+        }
+    });
+
+    let weak_pl = window.as_weak();
+    let state_pl = state.clone();
+    window.on_save_queue_as_playlist(move || {
+        if let Some(window) = weak_pl.upgrade() {
+            let mut state = state_pl.borrow_mut();
+            if state.queue.queue.is_empty() {
+                window.set_status("Queue is empty; add music first".into());
+                return;
+            }
+            let name = format!("Playlist {}", state.library.playlists.len() + 1);
+            let track_ids = state.queue.queue.clone();
+            let _ = state.library.create_playlist(&name, track_ids);
+            let lib_path = state.data_dir.join("library.json");
+            let _ = state.library.save(&lib_path);
+            window.set_status(format!("Saved {}", name).into());
+            refresh(&window, &state);
+        }
+    });
+
+    let weak_spl = window.as_weak();
+    let state_spl = state.clone();
+    window.on_select_playlist(move |index| {
+        if let Some(window) = weak_spl.upgrade() {
+            let mut state = state_spl.borrow_mut();
+            if let Some(pl) = state.library.playlists.get(index as usize).cloned() {
+                state.queue.queue = pl.track_ids;
+                state.queue.index = if state.queue.queue.is_empty() { None } else { Some(0) };
+                window.set_status(format!("Loaded {}", pl.name).into());
+                refresh(&window, &state);
+                if let Some(first_id) = state.queue.queue.first().cloned() {
+                    if let Some(track) = state.library.tracks.iter().find(|t| t.id == first_id).cloned() {
+                        let _ = play_track(&mut state, &window, &track);
+                    }
+                }
+            }
         }
     });
 
@@ -920,7 +1018,12 @@ fn advance(weak: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>>, next: bool
         };
         if moved {
             if let Some(index) = state.queue.index {
-                if let Some(track) = state.library.tracks.get(index).cloned() {
+                let track_opt = if let Some(track_id) = state.queue.queue.get(index) {
+                    state.library.tracks.iter().find(|t| &t.id == track_id).cloned()
+                } else {
+                    state.library.tracks.get(index).cloned()
+                };
+                if let Some(track) = track_opt {
                     let _ = play_track(&mut state, &window, &track);
                 }
             }
@@ -948,12 +1051,12 @@ fn apply_playback_state(state: &mut State, window: &AppWindow, playing: bool) {
             .map(AudioPlayer::has_track)
             .unwrap_or(false)
     {
-        if let Some(track) = state
-            .queue
-            .index
-            .and_then(|index| state.library.tracks.get(index))
-            .cloned()
-        {
+        let track_opt = if let Some(track_id) = state.queue.index.and_then(|i| state.queue.queue.get(i)) {
+            state.library.tracks.iter().find(|t| &t.id == track_id).cloned()
+        } else {
+            state.queue.index.and_then(|index| state.library.tracks.get(index)).cloned()
+        };
+        if let Some(track) = track_opt {
             let _ = play_track(state, window, &track);
         }
         return;
@@ -981,8 +1084,15 @@ fn play_track(state: &mut State, window: &AppWindow, track: &Track) -> bool {
         window.set_status("Audio output unavailable".into());
         return false;
     };
-    match audio.play(&track.path) {
+    match audio.play_with_options(&track.path, track.replay_gain_db) {
         Ok(()) => {
+            if let Some(next_idx) = state.queue.index.map(|i| i + 1) {
+                if let Some(next_id) = state.queue.queue.get(next_idx) {
+                    if let Some(next_track) = state.library.tracks.iter().find(|t| &t.id == next_id) {
+                        audio.preload_next(&next_track.path);
+                    }
+                }
+            }
             window.set_playback_position(0.0);
             window.set_playback_duration(track.duration_ms.unwrap_or(0) as f32 / 1000.0);
             state.queue.playing = true;
@@ -1065,10 +1175,14 @@ fn set_media_metadata(_state: &mut State, _track: &Track) {}
 #[cfg(not(target_os = "windows"))]
 fn set_media_playback(state: &mut State, playing: bool) {
     if let Some(controls) = state.media_controls.as_mut() {
+        let progress = state
+            .audio
+            .as_ref()
+            .map(|a| souvlaki::MediaPosition(a.position()));
         let playback = if playing {
-            souvlaki::MediaPlayback::Playing { progress: None }
+            souvlaki::MediaPlayback::Playing { progress }
         } else {
-            souvlaki::MediaPlayback::Paused { progress: None }
+            souvlaki::MediaPlayback::Paused { progress }
         };
         let _ = controls.set_playback(playback);
     }
@@ -1114,12 +1228,21 @@ fn refresh(window: &AppWindow, state: &State) {
     let visible = visible_indices(state);
     let items: Vec<SharedString> = visible.iter().map(|index| track_label(&state.library.tracks[*index])).collect();
     let ids: Vec<SharedString> = visible.iter().map(|index| state.library.tracks[*index].id.clone().into()).collect();
-    let queue_items: Vec<SharedString> = state.library.tracks.iter().map(track_label).collect();
-    let queue_ids: Vec<SharedString> = state.library.tracks.iter().map(|track| track.id.clone().into()).collect();
+    let queue_tracks: Vec<&Track> = state
+        .queue
+        .queue
+        .iter()
+        .filter_map(|id| state.library.tracks.iter().find(|t| &t.id == id))
+        .collect();
+    let queue_items: Vec<SharedString> = queue_tracks.iter().map(|t| track_label(t)).collect();
+    let queue_ids: Vec<SharedString> = queue_tracks.iter().map(|track| track.id.clone().into()).collect();
+    let playlist_names: Vec<SharedString> = state.library.playlists.iter().map(|p| p.name.clone().into()).collect();
     window.set_track_items(ModelRc::new(VecModel::from(items)));
     window.set_track_ids(ModelRc::new(VecModel::from(ids)));
     window.set_queue_items(ModelRc::new(VecModel::from(queue_items)));
     window.set_queue_ids(ModelRc::new(VecModel::from(queue_ids)));
+    window.set_playlists(ModelRc::new(VecModel::from(playlist_names)));
+    window.set_eq_name(state.audio.as_ref().map(|a| a.eq_preset.name()).unwrap_or("Flat").into());
     window.set_library_view(state.library_view as i32);
     window.set_theme_name(state.themes[state.theme_index].name.clone().into());
     window.set_show_library(
