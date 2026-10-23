@@ -75,7 +75,7 @@ An AppImage is not produced or advertised as installing `ahoy` globally. It need
 
 ## Terminal CLI/TUI
 
-Install it once on macOS, Linux, or Windows with Node.js 20+:
+Install it once on macOS, Linux, or Windows with Node.js 22.23.4+, 24.22.1+, or 26.12.1+ (within those major versions):
 
 ```sh
 npm install --global https://github.com/oooAHOYooo/ahoy-player/releases/download/v0.2.4/ahoy-player-terminal-0.2.4.tgz
@@ -113,7 +113,7 @@ ahoy player
 
 `ahoy player` is the interactive terminal player. Run `ahoy doctor` to check the library path and available audio player. To update a tarball install,
 repeat the command above with the newer release's version and asset URL. Node.js
-20+ is required on every platform. Audio playback uses
+22.23.4+, 24.22.1+, or 26.12.1+ (within those major versions) is required on every platform. Audio playback uses
 the built-in `afplay` on macOS; Linux requires `mpv`, VLC (`cvlc`), or FFmpeg
 (`ffplay`). On Windows, install `mpv` or FFmpeg (`ffplay`) and add its binary directory to `PATH`; Ahoy can then play audio. Live mixer changes through mpv IPC are currently available on macOS and Linux; on Windows, levels apply when playback starts.
 

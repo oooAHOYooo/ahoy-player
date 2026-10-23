@@ -17,5 +17,8 @@
     "typecheck": "npm run typecheck --workspace @ahoy/player-terminal",
     "test": "npm run test:terminal",
     "test:terminal": "npm test --workspace @ahoy/player-terminal"
+  },
+  "engines": {
+    "node": "^22.23.4 || ^24.22.1 || ^26.12.1"
   }
 }

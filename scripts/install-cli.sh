@@ -8,14 +8,17 @@ terminal_package="$install_root/apps/terminal"
 
 for required in git node npm; do
   if ! command -v "$required" >/dev/null 2>&1; then
-    printf 'Ahoy Player needs %s. Install Node.js 20+ (which includes npm) and Git, then try again.\n' "$required" >&2
+    printf 'Ahoy Player needs %s. Install Node.js 22.23.4+, 24.22.1+, or 26.12.1+ (within those major versions) (which includes npm) and Git, then try again.\n' "$required" >&2
     exit 1
   fi
 done
 
-node_major=$(node -p 'process.versions.node.split(".")[0]')
-if [ "$node_major" -lt 20 ]; then
-  printf 'Ahoy Player needs Node.js 20 or newer (found %s).\n' "$(node --version)" >&2
+if ! node -e '
+const [major, minor, patch] = process.versions.node.split(".").map(Number);
+const floor = {22: [23, 4], 24: [22, 1], 26: [12, 1]}[major];
+process.exit(floor && (minor > floor[0] || (minor === floor[0] && patch >= floor[1])) ? 0 : 1);
+'; then
+  printf 'Ahoy Player requires patched Node.js 22.23.4+, 24.22.1+, or 26.12.1+ within those major versions (found %s).\n' "$(node --version)" >&2
   exit 1
 fi
 
